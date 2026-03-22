@@ -37,13 +37,13 @@ A gaming-inspired status line for [Claude Code](https://claude.com/claude-code) 
 ```bash
 # Download status line script
 curl -o ~/.claude/statusline-hp.sh \
-  https://gist.githubusercontent.com/JerryLien/b968e6f592558e584dc90ada12babc08/raw/statusline-hp.sh \
+  https://raw.githubusercontent.com/JerryLien/claude-code-hp-statusline/main/statusline-hp.sh \
   && chmod +x ~/.claude/statusline-hp.sh
 
 # Download theme switcher skill (optional)
 mkdir -p ~/.claude/skills/statustheme
 curl -o ~/.claude/skills/statustheme/SKILL.md \
-  https://gist.githubusercontent.com/JerryLien/b968e6f592558e584dc90ada12babc08/raw/statusline-hp-SKILL.md
+  https://raw.githubusercontent.com/JerryLien/claude-code-hp-statusline/main/statusline-hp-SKILL.md
 ```
 
 Add to `~/.claude/settings.json`:
