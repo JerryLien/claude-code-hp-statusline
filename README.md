@@ -6,12 +6,12 @@ A gaming-inspired status line for [Claude Code](https://claude.com/claude-code) 
 
 ### RPG (default)
 ```
-⚔ Opus ↑H  ❤ 5h [█████████░░░░░░] 65%  ❤ 7d [████░░░░░░░░░░░] 28%  🧠 ▮▮▮▮▯▯▯▯▯▯ 42%  💰 $2.80  +87/-12
+⚔ Opus ↑H  ❤ 5h [█████████░░░░░░] 65% ↻2h29m  ❤ 7d [████░░░░░░░░░░░] 28% ↻1d4h  🧠 ▮▮▮▮▯▯▯▯▯▯ 42%  💰 $2.80  +87/-12
 ```
 
 ### Bloom
 ```
-🌱 Opus 🔴  5h 🌸🌸🌸🌸🌸·········· 35%  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72%  🍄 🌸🌸🌸🌸······ 42%  🌕 $2.80  +87/-12
+🌱 Opus 🔴  5h 🌸🌸🌸🌸🌸·········· 35% ↻2h29m  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72% ↻1d4h  🍄 🌸🌸🌸🌸······ 42%  🌕 $2.80  +87/-12
 ```
 
 ## What it shows
@@ -23,6 +23,7 @@ A gaming-inspired status line for [Claude Code](https://claude.com/claude-code) 
   - 🟢 Green: safe
   - 🟡 Yellow: moderate
   - 🔴 Red: slow down!
+  - ↻ Countdown to rate limit reset (e.g. `↻2h29m`, `↻1d4h`)
 - **Context** — Context window usage (🧠 or 🍄)
 - **Cost** — Session cost in USD. For Pro/Max subscribers, this shows the **equivalent API cost** of your session — a fun way to see how much value you're getting from your subscription
 - **+N/-N** — Lines of code added/removed this session
