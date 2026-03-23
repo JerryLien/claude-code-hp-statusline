@@ -77,6 +77,8 @@ curl -o ~/.claude/skills/statustheme/SKILL.md \
 
 Add to `~/.claude/settings.json`:
 
+> **Note:** `~` is not expanded in settings.json. Use `$HOME` or the full absolute path.
+
 ```json
 {
   "statusLine": {
