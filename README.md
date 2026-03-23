@@ -52,7 +52,7 @@ Add to `~/.claude/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline-hp.sh"
+    "command": "$HOME/.claude/statusline-hp.sh"
   }
 }
 ```
