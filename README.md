@@ -1,40 +1,57 @@
 # Claude Code HP Status Line ⚔❤
 
-A gaming-inspired status line for [Claude Code](https://claude.com/claude-code) that displays your usage limits as game-style health bars.
+> Turn your [Claude Code](https://claude.com/claude-code) status line into a game HUD. See usage limits as health bars, catch cache-miss regressions instantly, and get a loud heads-up the moment a new release drops.
 
-## Themes
-
-### RPG (default)
 ```
 ⚔ Opus ↑H  ❤ 5h [█████████░░░░░░] 65% ↻2h29m  ❤ 7d [████░░░░░░░░░░░] 28% ↻1d4h  🧠 ▮▮▮▮▯▯▯▯▯▯ 42% ⚡87%  🔮 2m14s  💰 $2.80  +87/-12  v2.1.105
 ```
 
-### Bloom
 ```
 🌱 Opus 🔴  5h 🌸🌸🌸🌸🌸·········· 35% ↻2h29m  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72% ↻1d4h  🍄 🌸🌸🌸🌸······ 42% ⚡87%  🌿 2m14s  🌕 $2.80  +87/-12  v2.1.105
 ```
 
+## Why?
+
+The default status line tells you very little. This one turns everything that matters into **at-a-glance HUD elements** so you can stay in flow instead of running `/status`, `/cost`, or `/doctor`. Two themes, zero dependencies beyond `python3`.
+
+## Features
+
+- ❤ **Health-bar rate limits** — 5-hour and 7-day windows with countdown to reset
+- 🧠 **Context window meter** — know exactly how much headroom you have
+- ⚡ **Cache hit ratio** — realtime feedback that your prompt caching is actually working
+- ⚠ **200k threshold alert** — loud warning the moment per-token pricing jumps
+- 🔮 **Total casting time** — how long you've been waiting on Claude this session
+- 💰 **Session cost** — equivalent API cost, even on Pro/Max subscriptions
+- 📈 **Lines changed** — `+/-` counter for edits made in this session
+- 🆕 **Update alert** — version number flips to a yellow badge the instant a newer release hits your local changelog cache
+- 🎨 **Two themes** — classic RPG (`⚔❤█░`) or peaceful Bloom garden (`🌱🌸🍄🌕`)
+
 ## What it shows
 
-- **Model + Effort** — Current model and effort level
-  - RPG: ↑H / ~M / ↓L
-  - Bloom: 🔴 / 🟡 / 🔵
-- **5h / 7d** — Usage bars for 5-hour and 7-day rolling windows (Pro/Max only)
-  - 🟢 Green: safe
-  - 🟡 Yellow: moderate
-  - 🔴 Red: slow down!
-  - ↻ Countdown to rate limit reset (e.g. `↻2h29m`, `↻1d4h`)
+### Always visible
+
+- **Model + Effort** — Current model and effort level. RPG: ↑H / ~M / ↓L · Bloom: 🔴 / 🟡 / 🔵
 - **Context** — Context window usage (🧠 or 🍄)
-- **⚡ Cache hit ratio** — How much of the recent prompt came from the Claude prompt cache. Green ≥70%, yellow ≥30%, red <30% — a great real-time check that caching is actually working
-- **⚠200k** — Red warning badge when the session crosses the 200k-token threshold (where per-token pricing goes up)
-- **🔮 / 🌿 Casting time** — Total time spent waiting on Claude API responses this session (RPG: 🔮 crystal ball, Bloom: 🌿 growing plant)
-- **Cost** — Session cost in USD. For Pro/Max subscribers, this shows the **equivalent API cost** of your session — a fun way to see how much value you're getting from your subscription
+- **Cost** — Session cost in USD. For Pro/Max subscribers, this shows the **equivalent API cost** — a fun way to see how much value you're getting from your subscription
 - **+N/-N** — Lines of code added/removed this session
-- **Version** — Claude Code version. Shows dim gray when up to date, **yellow highlight with `→X.Y.Z`** when a newer release is detected in Claude Code's local changelog cache
+- **Version** — Claude Code version, dim gray when up to date
+
+### Pro/Max only
+
+- **5h / 7d** — Rate-limit health bars for the 5-hour and 7-day rolling windows
+  - 🟢 Green: safe · 🟡 Yellow: moderate · 🔴 Red: slow down!
+  - ↻ Countdown to reset (e.g. `↻2h29m`, `↻1d4h`)
+
+### Smart alerts
+
+- **⚡ Cache hit ratio** — Green ≥70%, yellow ≥30%, red <30%. A great real-time check that prompt caching is actually working
+- **⚠ 200k** — Red warning badge when the session crosses the 200k-token threshold (where per-token pricing jumps)
+- **🔮 / 🌿 Casting time** — Total time spent waiting on Claude API responses this session. RPG: 🔮 crystal ball · Bloom: 🌿 growing plant
+- **v2.1.100→2.1.105** — Version badge goes yellow-highlighted with the target version when a newer release is detected in Claude Code's local changelog cache
 
 ### Conditional extras
 
-These only appear when the relevant data is present:
+Only appear when the relevant data is present:
 
 - **⌨N / ⌨I** — Current vim mode (NORMAL / INSERT), when vim mode is enabled
 - **·agent** — Agent name when launched via `--agent`
@@ -115,4 +132,4 @@ Add to `~/.claude/settings.json` for a full bloom experience:
 }
 ```
 
-Or just paste the gist URL into Claude Code and ask it to set up the status line for you.
+Or just paste this repo URL into Claude Code and ask it to set up the status line for you.
