@@ -30,7 +30,7 @@ The default status line tells you very little. This one turns everything that ma
 
 ### Always visible
 
-- **Model + Effort** — Current model and effort level. RPG: ↑H / ~M / ↓L · Bloom: 🔴 / 🟡 / 🔵
+- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / Max). RPG: ↓L / ~M / ↑H / ⇈X / ★M · Bloom: 🔵 / 🟡 / 🔴 / 🟣 / ⚫
 - **Context** — Context window usage (🧠 or 🍄)
 - **Cost** — Session cost in USD. For Pro/Max subscribers, this shows the **equivalent API cost** — a fun way to see how much value you're getting from your subscription
 - **+N/-N** — Lines of code added/removed this session

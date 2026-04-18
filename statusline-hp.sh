@@ -160,6 +160,8 @@ case "$THEME" in
     BAR_EMPTY="·"
     CTX_ICON="🍄"
     COST_ICON="🌕"
+    EFFORT_MAX="⚫"
+    EFFORT_XHIGH="🟣"
     EFFORT_HIGH="🔴"
     EFFORT_MED="🟡"
     EFFORT_LOW="🔵"
@@ -173,6 +175,8 @@ case "$THEME" in
     BAR_EMPTY="░"
     CTX_ICON="🧠"
     COST_ICON="💰"
+    EFFORT_MAX="★M"
+    EFFORT_XHIGH="⇈X"
     EFFORT_HIGH="↑H"
     EFFORT_MED="~M"
     EFFORT_LOW="↓L"
@@ -268,13 +272,14 @@ parts=""
 # Model name + effort level
 EFFORT_ICON=""
 if [[ "$MODEL" != *"Haiku"* ]] && [ -n "$EFFORT" ]; then
-  if [ "$EFFORT" = "high" ]; then
-    EFFORT_ICON="${BRIGHT_RED}${EFFORT_HIGH}${RESET}"
-  elif [ "$EFFORT" = "medium" ]; then
-    EFFORT_ICON="${BRIGHT_YELLOW}${EFFORT_MED}${RESET}"
-  elif [ "$EFFORT" = "low" ]; then
-    EFFORT_ICON="${GRAY}${EFFORT_LOW}${RESET}"
-  fi
+  # Case-insensitive match so "Max"/"max"/"MAX" all work
+  case "${EFFORT,,}" in
+    max)    EFFORT_ICON="${BOLD}${MAGENTA}${EFFORT_MAX}${RESET}" ;;
+    xhigh)  EFFORT_ICON="${MAGENTA}${EFFORT_XHIGH}${RESET}" ;;
+    high)   EFFORT_ICON="${BRIGHT_RED}${EFFORT_HIGH}${RESET}" ;;
+    medium) EFFORT_ICON="${BRIGHT_YELLOW}${EFFORT_MED}${RESET}" ;;
+    low)    EFFORT_ICON="${GRAY}${EFFORT_LOW}${RESET}" ;;
+  esac
 fi
 
 parts+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
