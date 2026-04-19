@@ -10,7 +10,7 @@ input=$(cat)
 
 # Parse all values in one python3 call (no jq needed)
 eval "$(INPUT="$input" python3 -c '
-import json, os, sys, time
+import json, os, re, sys, time
 
 try:
     d = json.loads(os.environ.get("INPUT", "{}"))
@@ -77,15 +77,45 @@ it = cu.get("input_tokens") or 0
 _cache_total = cr + cc + it
 cache_pct = int(cr * 100 / _cache_total) if _cache_total > 0 else -1
 
-effort = ""
+settings_effort = ""
 theme_file = ""
 try:
     with open(os.path.expanduser("~/.claude/settings.json")) as f:
         s = json.load(f)
-        effort = s.get("effortLevel", "")
+        settings_effort = s.get("effortLevel", "")
         theme_file = (s.get("env") or {}).get("STATUSLINE_THEME", "")
 except:
     pass
+
+# /model command writes effort to session state, not settings.json.
+# Extract the most recent effort from transcript as an override.
+# Anchor on "Set model to ... with X effort" to avoid matching conversation text.
+transcript_effort = ""
+effort_warning = 0
+VALID_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+tp = d.get("transcript_path")
+if tp:
+    try:
+        # Cap at 5MB tail — long sessions can exceed this but /model is usually
+        # in the recent history. Reading 5MB of text + regex is ~50ms, acceptable.
+        size = os.path.getsize(tp)
+        with open(tp, "rb") as f:
+            if size > 5_000_000:
+                f.seek(-5_000_000, 2)
+            tail = f.read().decode("utf-8", errors="replace")
+        # Require ANSI escape around the effort value — real /model output always
+        # has bold formatting, while conversational text about /model does not.
+        matches = re.findall(r"<local-command-stdout>Set model to[^<]*?with\s*\\u001b\[[\d;]*m([a-z]+)\\u001b", tail)
+        if matches:
+            candidate = matches[-1].lower()
+            if candidate in VALID_EFFORTS:
+                transcript_effort = candidate
+            else:
+                effort_warning = 1
+    except:
+        pass
+
+effort = transcript_effort or settings_effort
 
 # Latest version from the Claude Code changelog cache
 latest_version = ""
@@ -129,6 +159,7 @@ print(f"API_DURATION=\"{api_dur}\"")
 print(f"EXCEEDS_200K={exceeds_200k}")
 print(f"CACHE_PCT={cache_pct}")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
+print(f"EFFORT_WARNING={effort_warning}")
 ' 2>/dev/null)"
 
 THEME="${STATUSLINE_THEME:-${THEME_FILE:-rpg}}"
@@ -285,6 +316,8 @@ fi
 parts+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
 [ -n "$AGENT_NAME" ] && parts+="${GRAY}·${AGENT_NAME}${RESET}"
 [ -n "$EFFORT_ICON" ] && parts+=" ${EFFORT_ICON}"
+# Loud warning: /model output in transcript didn't match expected format
+[ "${EFFORT_WARNING:-0}" = "1" ] && parts+=" ${BRIGHT_RED}⚠effort${RESET}"
 
 # Vim mode
 if [ -n "$VIM_MODE" ]; then
