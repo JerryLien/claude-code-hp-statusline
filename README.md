@@ -30,7 +30,7 @@ The default status line tells you very little. This one turns everything that ma
 
 ### Always visible
 
-- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / Max). RPG: ↓L / ~M / ↑H / ⇈X / ★M · Bloom: 🔵 / 🟡 / 🔴 / 🟣 / ⚫
+- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / Max). RPG: ↓L / ~M / ↑H / ⇈X / ★M · Bloom: 🔵 / 🟡 / 🔴 / 🟣 / ⚫. Auto-syncs with `/model` selections mid-session, not just the saved default in `settings.json`
 - **Context** — Context window usage (🧠 or 🍄)
 - **Cost** — Session cost in USD. For Pro/Max subscribers, this shows the **equivalent API cost** — a fun way to see how much value you're getting from your subscription
 - **+N/-N** — Lines of code added/removed this session
@@ -48,6 +48,7 @@ The default status line tells you very little. This one turns everything that ma
 - **⚠ 200k** — Red warning badge when the session crosses the 200k-token threshold (where per-token pricing jumps)
 - **🔮 / 🌿 Casting time** — Total time spent waiting on Claude API responses this session. RPG: 🔮 crystal ball · Bloom: 🌿 growing plant
 - **v2.1.100→2.1.105** — Version badge goes yellow-highlighted with the target version when a newer release is detected in Claude Code's local changelog cache
+- **⚠effort** — Red badge appears next to the effort icon if the `/model` output format ever drifts from the expected pattern (so you know the parser needs a tweak)
 
 ### Conditional extras
 
