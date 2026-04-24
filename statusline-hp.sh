@@ -333,8 +333,9 @@ ctx_bar() {
   fi
 }
 
-# Build output
-parts=""
+# Build output — split into two rows for responsive multi-line
+parts_row1=""
+parts_row2=""
 
 # Model name + effort level
 EFFORT_ICON=""
@@ -349,76 +350,83 @@ if [[ "$MODEL" != *"Haiku"* ]] && [ -n "$EFFORT" ]; then
   esac
 fi
 
-parts+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
-[ -n "$SESSION_NAME" ] && parts+=" ${GRAY}#${SESSION_NAME}${RESET}"
-[ -n "$WORKTREE_NAME" ] && parts+=" ${GREEN}🌳${WORKTREE_NAME}${RESET}"
-[ -n "$AGENT_NAME" ] && parts+="${GRAY}·${AGENT_NAME}${RESET}"
-[ -n "$EFFORT_ICON" ] && parts+=" ${EFFORT_ICON}"
+parts_row1+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
+[ -n "$SESSION_NAME" ] && parts_row1+=" ${GRAY}#${SESSION_NAME}${RESET}"
+[ -n "$WORKTREE_NAME" ] && parts_row1+=" ${GREEN}🌳${WORKTREE_NAME}${RESET}"
+[ -n "$AGENT_NAME" ] && parts_row1+="${GRAY}·${AGENT_NAME}${RESET}"
+[ -n "$EFFORT_ICON" ] && parts_row1+=" ${EFFORT_ICON}"
 # Loud warning: /model output in transcript didn't match expected format
-[ "${EFFORT_WARNING:-0}" = "1" ] && parts+=" ${BRIGHT_RED}⚠effort${RESET}"
+[ "${EFFORT_WARNING:-0}" = "1" ] && parts_row1+=" ${BRIGHT_RED}⚠effort${RESET}"
 if [ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ]; then
-  parts+=" ${CYAN}${STYLE_ICON}${OUTPUT_STYLE}${RESET}"
+  parts_row1+=" ${CYAN}${STYLE_ICON}${OUTPUT_STYLE}${RESET}"
 fi
 
 # Vim mode
 if [ -n "$VIM_MODE" ]; then
-  parts+="  ${GRAY}⌨${VIM_MODE:0:1}${RESET}"
+  parts_row1+="  ${GRAY}⌨${VIM_MODE:0:1}${RESET}"
 fi
 
 # Usage bars (only if available — API users won't have these)
 if [ -n "$FIVE_H" ]; then
   five_int=$(printf "%.0f" "$FIVE_H" 2>/dev/null || echo "0")
   fh_icon="↻"; [ "${IS_5H_COOLDOWN:-0}" = "1" ] && fh_icon="$COOLDOWN_ICON"
-  parts+="  $(status_bar "$five_int" 15 "$LABEL_5H" "$FH_RESET" "$fh_icon")"
+  parts_row2+="  $(status_bar "$five_int" 15 "$LABEL_5H" "$FH_RESET" "$fh_icon")"
 fi
 
 if [ -n "$SEVEN_D" ]; then
   seven_int=$(printf "%.0f" "$SEVEN_D" 2>/dev/null || echo "0")
   sd_icon="↻"; [ "${IS_7D_COOLDOWN:-0}" = "1" ] && sd_icon="$COOLDOWN_ICON"
-  parts+="  $(status_bar "$seven_int" 15 "$LABEL_7D" "$SD_RESET" "$sd_icon")"
+  parts_row2+="  $(status_bar "$seven_int" 15 "$LABEL_7D" "$SD_RESET" "$sd_icon")"
 fi
 
 # Context window
-parts+="  $(ctx_bar "$CTX")"
+parts_row2+="  $(ctx_bar "$CTX")"
 
 # Cache hit ratio
 if [ "${CACHE_PCT:-"-1"}" -ge 0 ] 2>/dev/null; then
   if [ "$CACHE_PCT" -ge 70 ]; then cache_color="$BRIGHT_GREEN"
   elif [ "$CACHE_PCT" -ge 30 ]; then cache_color="$BRIGHT_YELLOW"
   else cache_color="$BRIGHT_RED"; fi
-  parts+=" ${cache_color}⚡${CACHE_PCT}%${RESET}"
+  parts_row2+=" ${cache_color}⚡${CACHE_PCT}%${RESET}"
 fi
 
 # 200k threshold warning
 if [ "${EXCEEDS_200K:-0}" = "1" ]; then
-  parts+=" ${BRIGHT_RED}⚠200k${RESET}"
+  parts_row2+=" ${BRIGHT_RED}⚠200k${RESET}"
 fi
 
 # API casting time
 if [ -n "$API_DURATION" ]; then
-  parts+="  ${MAGENTA}${CAST_ICON} ${API_DURATION}"
-  [ -n "$WALL_TIME" ] && parts+="/${WALL_TIME}"
-  parts+="${RESET}"
+  parts_row2+="  ${MAGENTA}${CAST_ICON} ${API_DURATION}"
+  [ -n "$WALL_TIME" ] && parts_row2+="/${WALL_TIME}"
+  parts_row2+="${RESET}"
 fi
 
 # Cost
 if [ -n "$COST" ]; then
-  parts+="  ${MAGENTA}${COST_ICON} \$${COST}${RESET}"
+  parts_row2+="  ${MAGENTA}${COST_ICON} \$${COST}${RESET}"
 fi
 
 # Lines changed
 if [ "$LINES_ADD" -gt 0 ] 2>/dev/null || [ "$LINES_DEL" -gt 0 ] 2>/dev/null; then
-  parts+="  ${GREEN}+${LINES_ADD}${RESET}/${RED}-${LINES_DEL}${RESET}"
+  parts_row2+="  ${GREEN}+${LINES_ADD}${RESET}/${RED}-${LINES_DEL}${RESET}"
 fi
 
 # Version (highlight if newer release available)
 if [ -n "$VERSION" ]; then
   if [ "${NEEDS_UPDATE:-0}" = "1" ]; then
     # Yellow background, black text — eye-catching but not alarming
-    parts+="  \033[43m\033[30m v${VERSION}→${LATEST_VERSION} \033[0m"
+    parts_row2+="  \033[43m\033[30m v${VERSION}→${LATEST_VERSION} \033[0m"
   else
-    parts+="  ${GRAY}v${VERSION}${RESET}"
+    parts_row2+="  ${GRAY}v${VERSION}${RESET}"
   fi
 fi
 
-echo -e "$parts"
+# Output: combined for now (multi-line decision added in next task)
+if [ -z "$parts_row1" ]; then
+  echo -e "$parts_row2"
+elif [ -z "$parts_row2" ]; then
+  echo -e "$parts_row1"
+else
+  echo -e "${parts_row1}  ${parts_row2}"
+fi
