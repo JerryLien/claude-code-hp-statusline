@@ -58,6 +58,23 @@ assert_contains "baseline-bloom" "bloom" \
   '{"model":{"display_name":"Opus"}}' \
   "Opus"
 
+# A1 output_style
+assert_contains "a1-explanatory-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"output_style":{"name":"explanatory"}}' \
+  "📖explanatory"
+
+assert_contains "a1-explanatory-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"output_style":{"name":"explanatory"}}' \
+  "🌻explanatory"
+
+assert_not_contains "a1-default-hidden-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"output_style":{"name":"default"}}' \
+  "📖"
+
+assert_not_contains "a1-default-hidden-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"output_style":{"name":"default"}}' \
+  "🌻"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"

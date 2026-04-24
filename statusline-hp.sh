@@ -67,6 +67,7 @@ lines_del = g(d, "cost", "total_lines_removed") or 0
 version = g(d, "version") or ""
 vim_mode = g(d, "vim", "mode") or ""
 agent_name = g(d, "agent", "name") or ""
+output_style = g(d, "output_style", "name") or ""
 api_dur = fmt_ms(g(d, "cost", "total_api_duration_ms"))
 exceeds_200k = 1 if g(d, "exceeds_200k_tokens") else 0
 
@@ -160,6 +161,7 @@ print(f"EXCEEDS_200K={exceeds_200k}")
 print(f"CACHE_PCT={cache_pct}")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
 print(f"EFFORT_WARNING={effort_warning}")
+print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
 ' 2>/dev/null)"
 
 THEME="${STATUSLINE_THEME:-${THEME_FILE:-rpg}}"
@@ -197,6 +199,7 @@ case "$THEME" in
     EFFORT_MED="🟡"
     EFFORT_LOW="🔵"
     CAST_ICON="🌿"
+    STYLE_ICON="🌻"
     BAR_INVERTED=1       # flowers = used, dots = remaining
     ;;
   *)
@@ -212,6 +215,7 @@ case "$THEME" in
     EFFORT_MED="~M"
     EFFORT_LOW="↓L"
     CAST_ICON="🔮"
+    STYLE_ICON="📖"
     ;;
 esac
 
@@ -318,6 +322,9 @@ parts+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
 [ -n "$EFFORT_ICON" ] && parts+=" ${EFFORT_ICON}"
 # Loud warning: /model output in transcript didn't match expected format
 [ "${EFFORT_WARNING:-0}" = "1" ] && parts+=" ${BRIGHT_RED}⚠effort${RESET}"
+if [ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ]; then
+  parts+=" ${CYAN}${STYLE_ICON}${OUTPUT_STYLE}${RESET}"
+fi
 
 # Vim mode
 if [ -n "$VIM_MODE" ]; then
