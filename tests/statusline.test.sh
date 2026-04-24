@@ -75,6 +75,15 @@ assert_not_contains "a1-default-hidden-bloom" "bloom" \
   '{"model":{"display_name":"Opus"},"output_style":{"name":"default"}}' \
   "🌻"
 
+# A3 session_name
+assert_contains "a3-session-name" "rpg" \
+  '{"model":{"display_name":"Opus"},"session_name":"my-feature"}' \
+  "#my-feature"
+
+assert_not_contains "a3-no-session-name" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "#"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"

@@ -68,6 +68,7 @@ version = g(d, "version") or ""
 vim_mode = g(d, "vim", "mode") or ""
 agent_name = g(d, "agent", "name") or ""
 output_style = g(d, "output_style", "name") or ""
+session_name = g(d, "session_name") or ""
 api_dur = fmt_ms(g(d, "cost", "total_api_duration_ms"))
 exceeds_200k = 1 if g(d, "exceeds_200k_tokens") else 0
 
@@ -162,6 +163,7 @@ print(f"CACHE_PCT={cache_pct}")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
 print(f"EFFORT_WARNING={effort_warning}")
 print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
+print(f"SESSION_NAME=\"{sh(session_name)}\"")
 ' 2>/dev/null)"
 
 THEME="${STATUSLINE_THEME:-${THEME_FILE:-rpg}}"
@@ -318,6 +320,7 @@ if [[ "$MODEL" != *"Haiku"* ]] && [ -n "$EFFORT" ]; then
 fi
 
 parts+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
+[ -n "$SESSION_NAME" ] && parts+=" ${GRAY}#${SESSION_NAME}${RESET}"
 [ -n "$AGENT_NAME" ] && parts+="${GRAY}·${AGENT_NAME}${RESET}"
 [ -n "$EFFORT_ICON" ] && parts+=" ${EFFORT_ICON}"
 # Loud warning: /model output in transcript didn't match expected format
