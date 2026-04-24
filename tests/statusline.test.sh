@@ -15,8 +15,8 @@ FAILED_NAMES=()
 assert_contains() {
   local name=$1 theme=$2 json=$3 pattern=$4
   local output
-  output=$(echo "$json" | STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1)
-  if echo "$output" | grep -qF "$pattern"; then
+  output=$(printf '%s\n' "$json" | STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1)
+  if printf '%s\n' "$output" | grep -qF "$pattern"; then
     PASS=$((PASS + 1))
     echo "PASS: $name"
   else
@@ -33,8 +33,8 @@ assert_contains() {
 assert_not_contains() {
   local name=$1 theme=$2 json=$3 pattern=$4
   local output
-  output=$(echo "$json" | STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1)
-  if echo "$output" | grep -qF "$pattern"; then
+  output=$(printf '%s\n' "$json" | STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1)
+  if printf '%s\n' "$output" | grep -qF "$pattern"; then
     FAIL=$((FAIL + 1))
     FAILED_NAMES+=("$name")
     echo "FAIL: $name (unexpected match)"
@@ -50,12 +50,15 @@ assert_not_contains() {
 # Helper: run statusline with custom effort via temp HOME
 run_with_effort() {
   local effort=$1 theme=$2 json=$3
-  local tmp
-  tmp=$(mktemp -d)
+  local tmp output status
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/statusline.XXXXXX") || return 1
   mkdir -p "$tmp/.claude"
-  echo "{\"effortLevel\":\"$effort\"}" > "$tmp/.claude/settings.json"
-  echo "$json" | HOME="$tmp" STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1
+  printf '{"effortLevel":"%s"}\n' "$effort" > "$tmp/.claude/settings.json"
+  output=$(printf '%s\n' "$json" | HOME="$tmp" STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1)
+  status=$?
   rm -rf "$tmp"
+  printf '%s' "$output"
+  return $status
 }
 
 assert_contains_effort() {
@@ -91,7 +94,7 @@ assert_not_contains_effort() {
 # Helper: run statusline with a specific COLUMNS value
 run_with_cols() {
   local cols=$1 theme=$2 json=$3
-  echo "$json" | COLUMNS="$cols" STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1
+  printf '%s\n' "$json" | COLUMNS="$cols" STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1
 }
 
 # assert_multiline <name> <cols> <theme> <json>

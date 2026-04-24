@@ -72,6 +72,15 @@ def is_cooldown(v):
 is_5h_cooldown = is_cooldown(five_h)
 is_7d_cooldown = is_cooldown(seven_d)
 
+def trunc_pct(v):
+    if v is None: return ""
+    try:
+        return str(int(float(v)))  # truncate toward zero
+    except (TypeError, ValueError):
+        return ""
+five_h_int = trunc_pct(five_h)
+seven_d_int = trunc_pct(seven_d)
+
 cost = g(d, "cost", "total_cost_usd")
 lines_add = g(d, "cost", "total_lines_added") or 0
 lines_del = g(d, "cost", "total_lines_removed") or 0
@@ -190,6 +199,8 @@ print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
 print(f"WORKSPACE_DIR=\"{sh(workspace_dir)}\"")
 print(f"IS_5H_COOLDOWN={is_5h_cooldown}")
 print(f"IS_7D_COOLDOWN={is_7d_cooldown}")
+print(f"FIVE_H_INT=\"{five_h_int}\"")
+print(f"SEVEN_D_INT=\"{seven_d_int}\"")
 ' 2>/dev/null)"
 
 THEME="${STATUSLINE_THEME:-${THEME_FILE:-rpg}}"
@@ -378,15 +389,13 @@ fi
 
 # Usage bars (only if available — API users won't have these)
 if [ -n "$FIVE_H" ]; then
-  five_int=$(printf "%.0f" "$FIVE_H" 2>/dev/null || echo "0")
   fh_icon="↻"; [ "${IS_5H_COOLDOWN:-0}" = "1" ] && fh_icon="$COOLDOWN_ICON"
-  parts_row2+="  $(status_bar "$five_int" 15 "$LABEL_5H" "$FH_RESET" "$fh_icon")"
+  parts_row2+="  $(status_bar "${FIVE_H_INT:-0}" 15 "$LABEL_5H" "$FH_RESET" "$fh_icon")"
 fi
 
 if [ -n "$SEVEN_D" ]; then
-  seven_int=$(printf "%.0f" "$SEVEN_D" 2>/dev/null || echo "0")
   sd_icon="↻"; [ "${IS_7D_COOLDOWN:-0}" = "1" ] && sd_icon="$COOLDOWN_ICON"
-  parts_row2+="  $(status_bar "$seven_int" 15 "$LABEL_7D" "$SD_RESET" "$sd_icon")"
+  parts_row2+="  $(status_bar "${SEVEN_D_INT:-0}" 15 "$LABEL_7D" "$SD_RESET" "$sd_icon")"
 fi
 
 # Context window
@@ -438,9 +447,17 @@ if [ -z "$parts_row1" ]; then
 elif [ -z "$parts_row2" ]; then
   echo -e "$parts_row1"
 else
-  cols=${COLUMNS:-$(tput cols 2>/dev/null || echo 999)}
-  # Measure display width of each row via python3
-  widths=$(printf '%s\n%s' "$parts_row1" "$parts_row2" | python3 -c '
+  cols=${COLUMNS:-$(tput cols 2>/dev/null || echo 120)}
+  # Sanitize: non-numeric values fall back to a safe default (matches spec)
+  case "$cols" in
+    ''|*[!0-9]*) cols=120 ;;
+  esac
+  # Fast path: very wide terminal → single line definitely fits, skip measurement
+  if [ "$cols" -ge 200 ]; then
+    echo -e "${parts_row1}  ${parts_row2}"
+  else
+    # Measure display width of each row via python3
+    widths=$(printf '%s\n%s' "$parts_row1" "$parts_row2" | python3 -c '
 import sys, re, unicodedata
 # Match both actual ESC byte (\x1b) and literal backslash-0-3-3 (\033)
 ANSI_RE = re.compile(r"(?:\x1b|\\033)\[[0-9;]*m")
@@ -461,14 +478,15 @@ def dw(s):
 for line in sys.stdin.read().split("\n")[:2]:
     print(dw(line))
 ' 2>/dev/null)
-  row1_w=$(echo "$widths" | sed -n "1p")
-  row2_w=$(echo "$widths" | sed -n "2p")
-  # Single-line total = row1 + "  " (2 cells) + row2, plus 4 cells safety margin
-  total_w=$(( ${row1_w:-0} + ${row2_w:-0} + 2 + 4 ))
-  if [ "$total_w" -gt "$cols" ]; then
-    echo -e "$parts_row1"
-    echo -e "$parts_row2"
-  else
-    echo -e "${parts_row1}  ${parts_row2}"
+    row1_w=$(echo "$widths" | sed -n "1p")
+    row2_w=$(echo "$widths" | sed -n "2p")
+    # Single-line total = row1 + "  " (2 cells) + row2, plus 4 cells safety margin
+    total_w=$(( ${row1_w:-0} + ${row2_w:-0} + 2 + 4 ))
+    if [ "$total_w" -gt "$cols" ]; then
+      echo -e "$parts_row1"
+      echo -e "$parts_row2"
+    else
+      echo -e "${parts_row1}  ${parts_row2}"
+    fi
   fi
 fi
