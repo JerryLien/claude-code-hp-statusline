@@ -105,6 +105,24 @@ assert_not_contains "a4-no-worktree" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "🌳"
 
+# A2 wall time
+# API=2m14s=134000ms, Wall=45m=2700000ms
+assert_contains "a2-wall-time-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000,"total_duration_ms":2700000}}' \
+  "/⏱45m"
+
+assert_contains "a2-wall-time-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000,"total_duration_ms":2700000}}' \
+  "/🕰45m"
+
+assert_not_contains "a2-no-wall" "rpg" \
+  '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000}}' \
+  "/⏱"
+
+assert_contains "a2-api-still-shown" "rpg" \
+  '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000}}' \
+  "🔮 2m14s"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"

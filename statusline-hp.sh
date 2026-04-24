@@ -71,6 +71,7 @@ output_style = g(d, "output_style", "name") or ""
 session_name = g(d, "session_name") or ""
 wt_name = g(d, "worktree", "name") or g(d, "workspace", "git_worktree") or ""
 api_dur = fmt_ms(g(d, "cost", "total_api_duration_ms"))
+wall_dur = fmt_ms(g(d, "cost", "total_duration_ms"))
 exceeds_200k = 1 if g(d, "exceeds_200k_tokens") else 0
 
 cu = g(d, "context_window", "current_usage") or {}
@@ -159,6 +160,7 @@ print(f"NEEDS_UPDATE={needs_update}")
 print(f"VIM_MODE=\"{sh(vim_mode)}\"")
 print(f"AGENT_NAME=\"{sh(agent_name)}\"")
 print(f"API_DURATION=\"{api_dur}\"")
+print(f"WALL_TIME=\"{wall_dur}\"")
 print(f"EXCEEDS_200K={exceeds_200k}")
 print(f"CACHE_PCT={cache_pct}")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
@@ -204,6 +206,7 @@ case "$THEME" in
     EFFORT_LOW="🔵"
     CAST_ICON="🌿"
     STYLE_ICON="🌻"
+    WALL_ICON="🕰"
     BAR_INVERTED=1       # flowers = used, dots = remaining
     ;;
   *)
@@ -220,6 +223,7 @@ case "$THEME" in
     EFFORT_LOW="↓L"
     CAST_ICON="🔮"
     STYLE_ICON="📖"
+    WALL_ICON="⏱"
     ;;
 esac
 
@@ -366,7 +370,9 @@ fi
 
 # API casting time
 if [ -n "$API_DURATION" ]; then
-  parts+="  ${MAGENTA}${CAST_ICON} ${API_DURATION}${RESET}"
+  parts+="  ${MAGENTA}${CAST_ICON} ${API_DURATION}"
+  [ -n "$WALL_TIME" ] && parts+="/${WALL_ICON}${WALL_TIME}"
+  parts+="${RESET}"
 fi
 
 # Cost
