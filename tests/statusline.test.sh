@@ -210,6 +210,18 @@ assert_not_contains_effort "b2-bloom-xhigh-no-reverse" "xhigh" "bloom" \
   '{"model":{"display_name":"Opus"}}' \
   $'\033[7m'
 
+# Integration: all features together
+FULL_JSON='{"model":{"display_name":"Opus"},"session_name":"my-feature","output_style":{"name":"explanatory"},"workspace":{"git_worktree":"wt-abc"},"cost":{"total_cost_usd":2.8,"total_api_duration_ms":134000,"total_duration_ms":2700000,"total_lines_added":87,"total_lines_removed":12},"rate_limits":{"five_hour":{"used_percentage":65.0,"resets_at":9999999999},"seven_day":{"used_percentage":100.0,"resets_at":9999999999}}}'
+
+assert_contains "integration-session" "rpg" "$FULL_JSON" "#my-feature"
+assert_contains "integration-worktree" "rpg" "$FULL_JSON" "🌳wt-abc"
+assert_contains "integration-style" "rpg" "$FULL_JSON" "📖explanatory"
+assert_contains "integration-wall" "rpg" "$FULL_JSON" "/⏱45m"
+assert_contains "integration-cooldown-7d" "rpg" "$FULL_JSON" "⏳"
+assert_contains "integration-rotate-5h" "rpg" "$FULL_JSON" "↻"
+assert_contains "integration-bloom-style" "bloom" "$FULL_JSON" "🌻explanatory"
+assert_contains "integration-bloom-cooldown" "bloom" "$FULL_JSON" "💤"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
