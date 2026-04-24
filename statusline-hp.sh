@@ -61,6 +61,17 @@ five_h = g(d, "rate_limits", "five_hour", "used_percentage")
 seven_d = g(d, "rate_limits", "seven_day", "used_percentage")
 fh_reset = g(d, "rate_limits", "five_hour", "resets_at")
 sd_reset = g(d, "rate_limits", "seven_day", "resets_at")
+
+def is_cooldown(v):
+    if v is None: return 0
+    try:
+        return 1 if float(v) >= 100.0 else 0
+    except (TypeError, ValueError):
+        return 0
+
+is_5h_cooldown = is_cooldown(five_h)
+is_7d_cooldown = is_cooldown(seven_d)
+
 cost = g(d, "cost", "total_cost_usd")
 lines_add = g(d, "cost", "total_lines_added") or 0
 lines_del = g(d, "cost", "total_lines_removed") or 0
@@ -168,6 +179,8 @@ print(f"EFFORT_WARNING={effort_warning}")
 print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
 print(f"SESSION_NAME=\"{sh(session_name)}\"")
 print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
+print(f"IS_5H_COOLDOWN={is_5h_cooldown}")
+print(f"IS_7D_COOLDOWN={is_7d_cooldown}")
 ' 2>/dev/null)"
 
 THEME="${STATUSLINE_THEME:-${THEME_FILE:-rpg}}"
@@ -207,6 +220,7 @@ case "$THEME" in
     CAST_ICON="🌿"
     STYLE_ICON="🌻"
     WALL_ICON="🕰"
+    COOLDOWN_ICON="💤"
     BAR_INVERTED=1       # flowers = used, dots = remaining
     ;;
   *)
@@ -224,6 +238,7 @@ case "$THEME" in
     CAST_ICON="🔮"
     STYLE_ICON="📖"
     WALL_ICON="⏱"
+    COOLDOWN_ICON="⏳"
     ;;
 esac
 
@@ -245,6 +260,7 @@ status_bar() {
   local width=${2:-20}
   local label=$3
   local reset_time=$4
+  local reset_icon=${5:-↻}
 
   # Clamp to [0, 100]
   [ "$used_pct" -lt 0 ] && used_pct=0
@@ -261,7 +277,7 @@ status_bar() {
   local bar_empty=""
 
   local reset_str=""
-  [ -n "$reset_time" ] && reset_str=" ${GRAY}↻${reset_time}${RESET}"
+  [ -n "$reset_time" ] && reset_str=" ${GRAY}${reset_icon}${reset_time}${RESET}"
 
   if [ "${BAR_INVERTED:-0}" = "1" ]; then
     # Inverted: flowers = used portion, dots = remaining
@@ -344,12 +360,14 @@ fi
 # Usage bars (only if available — API users won't have these)
 if [ -n "$FIVE_H" ]; then
   five_int=$(printf "%.0f" "$FIVE_H" 2>/dev/null || echo "0")
-  parts+="  $(status_bar "$five_int" 15 "$LABEL_5H" "$FH_RESET")"
+  fh_icon="↻"; [ "${IS_5H_COOLDOWN:-0}" = "1" ] && fh_icon="$COOLDOWN_ICON"
+  parts+="  $(status_bar "$five_int" 15 "$LABEL_5H" "$FH_RESET" "$fh_icon")"
 fi
 
 if [ -n "$SEVEN_D" ]; then
   seven_int=$(printf "%.0f" "$SEVEN_D" 2>/dev/null || echo "0")
-  parts+="  $(status_bar "$seven_int" 15 "$LABEL_7D" "$SD_RESET")"
+  sd_icon="↻"; [ "${IS_7D_COOLDOWN:-0}" = "1" ] && sd_icon="$COOLDOWN_ICON"
+  parts+="  $(status_bar "$seven_int" 15 "$LABEL_7D" "$SD_RESET" "$sd_icon")"
 fi
 
 # Context window

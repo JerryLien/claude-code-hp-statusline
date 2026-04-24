@@ -123,6 +123,27 @@ assert_contains "a2-api-still-shown" "rpg" \
   '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000}}' \
   "🔮 2m14s"
 
+# B1 cooldown icon at 100%
+assert_contains "b1-7d-cooldown-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"rate_limits":{"seven_day":{"used_percentage":100.0,"resets_at":9999999999}}}' \
+  "⏳"
+
+assert_contains "b1-7d-cooldown-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"rate_limits":{"seven_day":{"used_percentage":100.0,"resets_at":9999999999}}}' \
+  "💤"
+
+assert_contains "b1-5h-cooldown-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"rate_limits":{"five_hour":{"used_percentage":100.0,"resets_at":9999999999}}}' \
+  "⏳"
+
+assert_not_contains "b1-99-percent-no-cooldown" "rpg" \
+  '{"model":{"display_name":"Opus"},"rate_limits":{"seven_day":{"used_percentage":99.99,"resets_at":9999999999}}}' \
+  "⏳"
+
+assert_contains "b1-7d-normal-rotate" "rpg" \
+  '{"model":{"display_name":"Opus"},"rate_limits":{"seven_day":{"used_percentage":50.0,"resets_at":9999999999}}}' \
+  "↻"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
