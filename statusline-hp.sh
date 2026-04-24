@@ -81,6 +81,14 @@ agent_name = g(d, "agent", "name") or ""
 output_style = g(d, "output_style", "name") or ""
 session_name = g(d, "session_name") or ""
 wt_name = g(d, "worktree", "name") or g(d, "workspace", "git_worktree") or ""
+cwd = g(d, "workspace", "current_dir") or g(d, "cwd") or ""
+home = os.path.expanduser("~")
+if cwd == home:
+    workspace_dir = "~"
+elif cwd:
+    workspace_dir = os.path.basename(cwd)
+else:
+    workspace_dir = ""
 api_dur = fmt_ms(g(d, "cost", "total_api_duration_ms"))
 wall_dur = fmt_ms(g(d, "cost", "total_duration_ms"))
 exceeds_200k = 1 if g(d, "exceeds_200k_tokens") else 0
@@ -179,6 +187,7 @@ print(f"EFFORT_WARNING={effort_warning}")
 print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
 print(f"SESSION_NAME=\"{sh(session_name)}\"")
 print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
+print(f"WORKSPACE_DIR=\"{sh(workspace_dir)}\"")
 print(f"IS_5H_COOLDOWN={is_5h_cooldown}")
 print(f"IS_7D_COOLDOWN={is_7d_cooldown}")
 ' 2>/dev/null)"
@@ -212,11 +221,11 @@ case "$THEME" in
     BAR_EMPTY="·"
     CTX_ICON="🍄"
     COST_ICON="🌕"
-    EFFORT_MAX="⚫"
-    EFFORT_XHIGH="🟣"
-    EFFORT_HIGH="🔴"
-    EFFORT_MED="🟡"
-    EFFORT_LOW="🔵"
+    EFFORT_MAX="⚫ max"
+    EFFORT_XHIGH="🟣 xhigh"
+    EFFORT_HIGH="🔴 high"
+    EFFORT_MED="🟡 medium"
+    EFFORT_LOW="🔵 low"
     EFFORT_MAX_STYLE="\033[7m"
     EFFORT_XHIGH_STYLE=""
     EFFORT_HIGH_STYLE=""
@@ -234,11 +243,11 @@ case "$THEME" in
     BAR_EMPTY="░"
     CTX_ICON="🧠"
     COST_ICON="💰"
-    EFFORT_MAX="★M"
-    EFFORT_XHIGH="⇈X"
-    EFFORT_HIGH="↑H"
-    EFFORT_MED="~M"
-    EFFORT_LOW="↓L"
+    EFFORT_MAX="★max"
+    EFFORT_XHIGH="⇈xhigh"
+    EFFORT_HIGH="↑high"
+    EFFORT_MED="~medium"
+    EFFORT_LOW="↓low"
     EFFORT_MAX_STYLE="\033[7m${BOLD}${MAGENTA}"
     EFFORT_XHIGH_STYLE="${BOLD}${MAGENTA}"
     EFFORT_HIGH_STYLE="${BRIGHT_RED}"
@@ -351,6 +360,7 @@ if [[ "$MODEL" != *"Haiku"* ]] && [ -n "$EFFORT" ]; then
 fi
 
 parts_row1+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
+[ -n "$WORKSPACE_DIR" ] && parts_row1+=" ${CYAN}📁 ${WORKSPACE_DIR}${RESET}"
 [ -n "$SESSION_NAME" ] && parts_row1+=" ${GRAY}#${SESSION_NAME}${RESET}"
 [ -n "$WORKTREE_NAME" ] && parts_row1+=" ${GREEN}🌳${WORKTREE_NAME}${RESET}"
 [ -n "$AGENT_NAME" ] && parts_row1+="${GRAY}·${AGENT_NAME}${RESET}"

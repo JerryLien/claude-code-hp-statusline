@@ -283,6 +283,37 @@ assert_single_line "mr-wide-single-line-bloom" "250" "bloom" "$FULL_JSON_MR"
 assert_single_line "mr-minimal-narrow" "80" "rpg" \
   '{"model":{"display_name":"Opus"}}'
 
+# Workspace dir display
+assert_contains "workspace-dir-basename" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/my-project"}}' \
+  "📁 my-project"
+
+assert_contains "workspace-dir-cwd-fallback" "rpg" \
+  '{"model":{"display_name":"Opus"},"cwd":"/var/tmp/foo"}' \
+  "📁 foo"
+
+assert_not_contains "workspace-dir-no-field" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "📁"
+
+# Effort label spelled out (RPG)
+assert_contains_effort "effort-word-max-rpg" "max" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "★max"
+
+assert_contains_effort "effort-word-high-rpg" "high" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "↑high"
+
+# Effort label spelled out (Bloom)
+assert_contains_effort "effort-word-max-bloom" "max" "bloom" \
+  '{"model":{"display_name":"Opus"}}' \
+  "⚫ max"
+
+assert_contains_effort "effort-word-high-bloom" "high" "bloom" \
+  '{"model":{"display_name":"Opus"}}' \
+  "🔴 high"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
