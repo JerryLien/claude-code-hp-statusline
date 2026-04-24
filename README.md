@@ -25,6 +25,7 @@ The default status line tells you very little. This one turns everything that ma
 - 📈 **Lines changed** — `+/-` counter for edits made in this session
 - 🆕 **Update alert** — version number flips to a yellow badge the instant a newer release hits your local changelog cache
 - 🎨 **Two themes** — classic RPG (`⚔❤█░`) or peaceful Bloom garden (`🌱🌸🍄🌕`)
+- 📏 **Responsive layout** — auto-wraps into 2 rows (identity / metrics) when the terminal is too narrow, stays single-line on wide screens
 
 ## What it shows
 

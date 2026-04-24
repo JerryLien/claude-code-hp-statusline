@@ -422,11 +422,43 @@ if [ -n "$VERSION" ]; then
   fi
 fi
 
-# Output: combined for now (multi-line decision added in next task)
+# Responsive output: single line if it fits, else 2 rows
 if [ -z "$parts_row1" ]; then
   echo -e "$parts_row2"
 elif [ -z "$parts_row2" ]; then
   echo -e "$parts_row1"
 else
-  echo -e "${parts_row1}  ${parts_row2}"
+  cols=${COLUMNS:-$(tput cols 2>/dev/null || echo 999)}
+  # Measure display width of each row via python3
+  widths=$(printf '%s\n%s' "$parts_row1" "$parts_row2" | python3 -c '
+import sys, re, unicodedata
+# Match both actual ESC byte (\x1b) and literal backslash-0-3-3 (\033)
+ANSI_RE = re.compile(r"(?:\x1b|\\033)\[[0-9;]*m")
+def dw(s):
+    s = ANSI_RE.sub("", s)
+    w = 0
+    for ch in s:
+        if unicodedata.category(ch).startswith("M"):
+            continue
+        if unicodedata.east_asian_width(ch) in ("W", "F"):
+            w += 2
+            continue
+        if ord(ch) >= 0x2600:
+            w += 2
+            continue
+        w += 1
+    return w
+for line in sys.stdin.read().split("\n")[:2]:
+    print(dw(line))
+' 2>/dev/null)
+  row1_w=$(echo "$widths" | sed -n "1p")
+  row2_w=$(echo "$widths" | sed -n "2p")
+  # Single-line total = row1 + "  " (2 cells) + row2, plus 4 cells safety margin
+  total_w=$(( ${row1_w:-0} + ${row2_w:-0} + 2 + 4 ))
+  if [ "$total_w" -gt "$cols" ]; then
+    echo -e "$parts_row1"
+    echo -e "$parts_row2"
+  else
+    echo -e "${parts_row1}  ${parts_row2}"
+  fi
 fi

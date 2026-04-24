@@ -88,6 +88,48 @@ assert_not_contains_effort() {
   fi
 }
 
+# Helper: run statusline with a specific COLUMNS value
+run_with_cols() {
+  local cols=$1 theme=$2 json=$3
+  echo "$json" | COLUMNS="$cols" STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1
+}
+
+# assert_multiline <name> <cols> <theme> <json>
+assert_multiline() {
+  local name=$1 cols=$2 theme=$3 json=$4
+  local output
+  output=$(run_with_cols "$cols" "$theme" "$json")
+  local line_count
+  line_count=$(printf '%s' "$output" | awk 'END{print NR}')
+  if [ "$line_count" -gt 1 ]; then
+    PASS=$((PASS + 1))
+    echo "PASS: $name"
+  else
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES+=("$name")
+    echo "FAIL: $name (expected multi-line, got $line_count line(s))"
+    echo "  Output: $output"
+  fi
+}
+
+# assert_single_line <name> <cols> <theme> <json>
+assert_single_line() {
+  local name=$1 cols=$2 theme=$3 json=$4
+  local output
+  output=$(run_with_cols "$cols" "$theme" "$json")
+  local line_count
+  line_count=$(printf '%s' "$output" | awk 'END{print NR}')
+  if [ "$line_count" -eq 1 ]; then
+    PASS=$((PASS + 1))
+    echo "PASS: $name"
+  else
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES+=("$name")
+    echo "FAIL: $name (expected single line, got $line_count line(s))"
+    echo "  Output: $output"
+  fi
+}
+
 # --- Tests go below ---
 
 # Baseline: minimal JSON works (regression)
@@ -230,6 +272,16 @@ assert_not_contains "a2-no-stopwatch-icon" "rpg" \
 assert_not_contains "a2-no-pendulum-icon" "bloom" \
   '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000,"total_duration_ms":2700000}}' \
   "🕰"
+
+# Responsive multi-line behavior
+FULL_JSON_MR='{"model":{"display_name":"Opus"},"session_name":"demo","output_style":{"name":"explanatory"},"workspace":{"git_worktree":"wt-abc"},"cost":{"total_cost_usd":2.8,"total_api_duration_ms":134000,"total_duration_ms":2700000,"total_lines_added":87,"total_lines_removed":12},"context_window":{"used_percentage":42},"rate_limits":{"five_hour":{"used_percentage":65.0,"resets_at":9999999999},"seven_day":{"used_percentage":100.0,"resets_at":9999999999}},"version":"2.1.105"}'
+
+assert_multiline "mr-narrow-wraps-rpg" "80" "rpg" "$FULL_JSON_MR"
+assert_multiline "mr-narrow-wraps-bloom" "80" "bloom" "$FULL_JSON_MR"
+assert_single_line "mr-wide-single-line-rpg" "250" "rpg" "$FULL_JSON_MR"
+assert_single_line "mr-wide-single-line-bloom" "250" "bloom" "$FULL_JSON_MR"
+assert_single_line "mr-minimal-narrow" "80" "rpg" \
+  '{"model":{"display_name":"Opus"}}'
 
 # --- Summary ---
 echo ""
