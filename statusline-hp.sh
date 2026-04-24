@@ -217,6 +217,11 @@ case "$THEME" in
     EFFORT_HIGH="🔴"
     EFFORT_MED="🟡"
     EFFORT_LOW="🔵"
+    EFFORT_MAX_STYLE="\033[7m"
+    EFFORT_XHIGH_STYLE=""
+    EFFORT_HIGH_STYLE=""
+    EFFORT_MED_STYLE=""
+    EFFORT_LOW_STYLE=""
     CAST_ICON="🌿"
     STYLE_ICON="🌻"
     WALL_ICON="🕰"
@@ -235,6 +240,11 @@ case "$THEME" in
     EFFORT_HIGH="↑H"
     EFFORT_MED="~M"
     EFFORT_LOW="↓L"
+    EFFORT_MAX_STYLE="\033[7m${BOLD}${MAGENTA}"
+    EFFORT_XHIGH_STYLE="${BOLD}${MAGENTA}"
+    EFFORT_HIGH_STYLE="${BRIGHT_RED}"
+    EFFORT_MED_STYLE="${BRIGHT_YELLOW}"
+    EFFORT_LOW_STYLE="${GRAY}"
     CAST_ICON="🔮"
     STYLE_ICON="📖"
     WALL_ICON="⏱"
@@ -333,11 +343,11 @@ EFFORT_ICON=""
 if [[ "$MODEL" != *"Haiku"* ]] && [ -n "$EFFORT" ]; then
   # Case-insensitive match so "Max"/"max"/"MAX" all work
   case "${EFFORT,,}" in
-    max)    EFFORT_ICON="${BOLD}${MAGENTA}${EFFORT_MAX}${RESET}" ;;
-    xhigh)  EFFORT_ICON="${MAGENTA}${EFFORT_XHIGH}${RESET}" ;;
-    high)   EFFORT_ICON="${BRIGHT_RED}${EFFORT_HIGH}${RESET}" ;;
-    medium) EFFORT_ICON="${BRIGHT_YELLOW}${EFFORT_MED}${RESET}" ;;
-    low)    EFFORT_ICON="${GRAY}${EFFORT_LOW}${RESET}" ;;
+    max)    EFFORT_ICON="${EFFORT_MAX_STYLE}${EFFORT_MAX}${RESET}" ;;
+    xhigh)  EFFORT_ICON="${EFFORT_XHIGH_STYLE}${EFFORT_XHIGH}${RESET}" ;;
+    high)   EFFORT_ICON="${EFFORT_HIGH_STYLE}${EFFORT_HIGH}${RESET}" ;;
+    medium) EFFORT_ICON="${EFFORT_MED_STYLE}${EFFORT_MED}${RESET}" ;;
+    low)    EFFORT_ICON="${EFFORT_LOW_STYLE}${EFFORT_LOW}${RESET}" ;;
   esac
 fi
 

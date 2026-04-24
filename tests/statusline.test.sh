@@ -47,6 +47,47 @@ assert_not_contains() {
   fi
 }
 
+# Helper: run statusline with custom effort via temp HOME
+run_with_effort() {
+  local effort=$1 theme=$2 json=$3
+  local tmp
+  tmp=$(mktemp -d)
+  mkdir -p "$tmp/.claude"
+  echo "{\"effortLevel\":\"$effort\"}" > "$tmp/.claude/settings.json"
+  echo "$json" | HOME="$tmp" STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1
+  rm -rf "$tmp"
+}
+
+assert_contains_effort() {
+  local name=$1 effort=$2 theme=$3 json=$4 pattern=$5
+  local output
+  output=$(run_with_effort "$effort" "$theme" "$json")
+  if echo "$output" | grep -qF "$pattern"; then
+    PASS=$((PASS + 1))
+    echo "PASS: $name"
+  else
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES+=("$name")
+    echo "FAIL: $name"
+    echo "  Output:  $output"
+  fi
+}
+
+assert_not_contains_effort() {
+  local name=$1 effort=$2 theme=$3 json=$4 pattern=$5
+  local output
+  output=$(run_with_effort "$effort" "$theme" "$json")
+  if echo "$output" | grep -qF "$pattern"; then
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES+=("$name")
+    echo "FAIL: $name (unexpected match)"
+    echo "  Output:  $output"
+  else
+    PASS=$((PASS + 1))
+    echo "PASS: $name"
+  fi
+}
+
 # --- Tests go below ---
 
 # Baseline: minimal JSON works (regression)
@@ -143,6 +184,31 @@ assert_not_contains "b1-99-percent-no-cooldown" "rpg" \
 assert_contains "b1-7d-normal-rotate" "rpg" \
   '{"model":{"display_name":"Opus"},"rate_limits":{"seven_day":{"used_percentage":50.0,"resets_at":9999999999}}}' \
   "↻"
+
+# B2 effort gradient
+assert_contains_effort "b2-rpg-max-reverse" "max" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  $'\033[7m'
+
+assert_contains_effort "b2-rpg-xhigh-bold" "xhigh" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  $'\033[1m'
+
+assert_not_contains_effort "b2-rpg-xhigh-no-reverse" "xhigh" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  $'\033[7m'
+
+assert_not_contains_effort "b2-rpg-high-no-reverse" "high" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  $'\033[7m'
+
+assert_contains_effort "b2-bloom-max-reverse" "max" "bloom" \
+  '{"model":{"display_name":"Opus"}}' \
+  $'\033[7m'
+
+assert_not_contains_effort "b2-bloom-xhigh-no-reverse" "xhigh" "bloom" \
+  '{"model":{"display_name":"Opus"}}' \
+  $'\033[7m'
 
 # --- Summary ---
 echo ""
