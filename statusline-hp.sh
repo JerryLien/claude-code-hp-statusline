@@ -224,7 +224,6 @@ case "$THEME" in
     EFFORT_LOW_STYLE=""
     CAST_ICON="🌿"
     STYLE_ICON="🌻"
-    WALL_ICON="🕰"
     COOLDOWN_ICON="💤"
     BAR_INVERTED=1       # flowers = used, dots = remaining
     ;;
@@ -247,7 +246,6 @@ case "$THEME" in
     EFFORT_LOW_STYLE="${GRAY}"
     CAST_ICON="🔮"
     STYLE_ICON="📖"
-    WALL_ICON="⏱"
     COOLDOWN_ICON="⏳"
     ;;
 esac
@@ -399,7 +397,7 @@ fi
 # API casting time
 if [ -n "$API_DURATION" ]; then
   parts+="  ${MAGENTA}${CAST_ICON} ${API_DURATION}"
-  [ -n "$WALL_TIME" ] && parts+="/${WALL_ICON}${WALL_TIME}"
+  [ -n "$WALL_TIME" ] && parts+="/${WALL_TIME}"
   parts+="${RESET}"
 fi
 

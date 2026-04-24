@@ -150,15 +150,15 @@ assert_not_contains "a4-no-worktree" "rpg" \
 # API=2m14s=134000ms, Wall=45m=2700000ms
 assert_contains "a2-wall-time-rpg" "rpg" \
   '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000,"total_duration_ms":2700000}}' \
-  "/⏱45m"
+  "2m14s/45m"
 
 assert_contains "a2-wall-time-bloom" "bloom" \
   '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000,"total_duration_ms":2700000}}' \
-  "/🕰45m"
+  "2m14s/45m"
 
 assert_not_contains "a2-no-wall" "rpg" \
   '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000}}' \
-  "/⏱"
+  "/45m"
 
 assert_contains "a2-api-still-shown" "rpg" \
   '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000}}' \
@@ -216,11 +216,20 @@ FULL_JSON='{"model":{"display_name":"Opus"},"session_name":"my-feature","output_
 assert_contains "integration-session" "rpg" "$FULL_JSON" "#my-feature"
 assert_contains "integration-worktree" "rpg" "$FULL_JSON" "🌳wt-abc"
 assert_contains "integration-style" "rpg" "$FULL_JSON" "📖explanatory"
-assert_contains "integration-wall" "rpg" "$FULL_JSON" "/⏱45m"
+assert_contains "integration-wall" "rpg" "$FULL_JSON" "/45m"
 assert_contains "integration-cooldown-7d" "rpg" "$FULL_JSON" "⏳"
 assert_contains "integration-rotate-5h" "rpg" "$FULL_JSON" "↻"
 assert_contains "integration-bloom-style" "bloom" "$FULL_JSON" "🌻explanatory"
 assert_contains "integration-bloom-cooldown" "bloom" "$FULL_JSON" "💤"
+
+# A2 wall-time icons removed
+assert_not_contains "a2-no-stopwatch-icon" "rpg" \
+  '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000,"total_duration_ms":2700000}}' \
+  "⏱"
+
+assert_not_contains "a2-no-pendulum-icon" "bloom" \
+  '{"model":{"display_name":"Opus"},"cost":{"total_api_duration_ms":134000,"total_duration_ms":2700000}}' \
+  "🕰"
 
 # --- Summary ---
 echo ""
