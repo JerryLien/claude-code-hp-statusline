@@ -9,13 +9,13 @@
 **Tech Stack:** Bash 4+, Python 3, ANSI escape codes.
 
 **Spec deviation flagged for review:**
-Spec §2 states Bloom `max` = bold. Emoji (`⚫`) ignore `\033[1m`, so bold produces no visible change. This plan uses **reverse video** (`\033[7m`) for Bloom `max` to honor the "max is most dramatic" design intent. Reverse video creates a highlighted background block behind the emoji in most terminals. If you prefer to keep strict bold (invisible but spec-accurate), swap the `\033[7m` for `\033[1m` in Task 6.
+Spec §2 states Bloom `max` = bold. Emoji (`⚫`) ignore `\033[1m`, so bold produces no visible change. This plan uses **reverse video** (`\033[7m`) for Bloom `max` to honor the "max is most dramatic" design intent. Reverse video creates a highlighted background block behind the emoji in most terminals. If you prefer to keep strict bold (invisible but spec-accurate), swap the `\033[7m` for `\033[1m` in Task 7.
 
 ---
 
 ## File Structure
 
-Only one file changes: `/home/jerrylien/src/claude-code-hp-statusline/statusline-hp.sh`.
+The primary implementation changes land in `/home/jerrylien/src/claude-code-hp-statusline/statusline-hp.sh`. Tests live in `tests/statusline.test.sh` (new file) and documentation in `README.md` is updated in Task 9.
 
 A lightweight test harness is added: `/home/jerrylien/src/claude-code-hp-statusline/tests/statusline.test.sh`. This is a plain Bash script that pipes mock JSON into the statusline and greps the output for expected tokens. No test framework, no dependencies.
 

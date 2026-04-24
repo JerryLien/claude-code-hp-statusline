@@ -31,7 +31,7 @@ The default status line tells you very little. This one turns everything that ma
 
 ### Always visible
 
-- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / Max). RPG: ↓L / ~M / ↑H / ⇈X / ★M · Bloom: 🔵 / 🟡 / 🔴 / 🟣 / ⚫. Auto-syncs with `/model` selections mid-session, not just the saved default in `settings.json`
+- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / max). RPG: ↓low / ~medium / ↑high / ⇈xhigh / ★max · Bloom: 🔵 low / 🟡 medium / 🔴 high / 🟣 xhigh / ⚫ max. Auto-syncs with `/model` selections mid-session, not just the saved default in `settings.json`
 - **Output style** — Current output style name when set to a non-default value (📖 RPG · 🌻 Bloom)
 - **Session name** — `#<name>` when the session was named via `--name` or `/rename`, helpful for juggling multiple sessions
 - **Worktree** — `🌳<name>` when working inside a linked git worktree (prefers `worktree.name` from `--worktree` sessions, falls back to `workspace.git_worktree`)
@@ -50,7 +50,7 @@ The default status line tells you very little. This one turns everything that ma
 
 - **⚡ Cache hit ratio** — Green ≥70%, yellow ≥30%, red <30%. A great real-time check that prompt caching is actually working
 - **⚠ 200k** — Red warning badge when the session crosses the 200k-token threshold (where per-token pricing jumps)
-- **🔮 / 🌿 Casting time + wall time** — Total time spent waiting on Claude API responses, followed by total session wall time (e.g. `🔮 2m14s/⏱45m`). RPG: 🔮 crystal ball + ⏱ stopwatch · Bloom: 🌿 growing plant + 🕰 pendulum clock
+- **🔮 / 🌿 Casting time + wall time** — Total time spent waiting on Claude API responses, followed by total session wall time (e.g. `🔮 2m14s/45m`). RPG: 🔮 crystal ball · Bloom: 🌿 growing plant
 - **v2.1.100→2.1.105** — Version badge goes yellow-highlighted with the target version when a newer release is detected in Claude Code's local changelog cache
 - **⚠effort** — Red badge appears next to the effort icon if the `/model` output format ever drifts from the expected pattern (so you know the parser needs a tweak)
 - **⏳ / 💤 Cooldown** — When a rate limit hits 100%, the reset countdown icon changes (⏳ RPG · 💤 Bloom) to signal the countdown is to cooldown lift, not a full window reset
