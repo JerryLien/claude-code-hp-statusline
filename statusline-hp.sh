@@ -69,6 +69,7 @@ vim_mode = g(d, "vim", "mode") or ""
 agent_name = g(d, "agent", "name") or ""
 output_style = g(d, "output_style", "name") or ""
 session_name = g(d, "session_name") or ""
+wt_name = g(d, "worktree", "name") or g(d, "workspace", "git_worktree") or ""
 api_dur = fmt_ms(g(d, "cost", "total_api_duration_ms"))
 exceeds_200k = 1 if g(d, "exceeds_200k_tokens") else 0
 
@@ -164,6 +165,7 @@ print(f"THEME_FILE=\"{sh(theme_file)}\"")
 print(f"EFFORT_WARNING={effort_warning}")
 print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
 print(f"SESSION_NAME=\"{sh(session_name)}\"")
+print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
 ' 2>/dev/null)"
 
 THEME="${STATUSLINE_THEME:-${THEME_FILE:-rpg}}"
@@ -321,6 +323,7 @@ fi
 
 parts+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
 [ -n "$SESSION_NAME" ] && parts+=" ${GRAY}#${SESSION_NAME}${RESET}"
+[ -n "$WORKTREE_NAME" ] && parts+=" ${GREEN}🌳${WORKTREE_NAME}${RESET}"
 [ -n "$AGENT_NAME" ] && parts+="${GRAY}·${AGENT_NAME}${RESET}"
 [ -n "$EFFORT_ICON" ] && parts+=" ${EFFORT_ICON}"
 # Loud warning: /model output in transcript didn't match expected format

@@ -84,6 +84,27 @@ assert_not_contains "a3-no-session-name" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "#"
 
+# A4 worktree
+assert_contains "a4-git-worktree" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"git_worktree":"feature-xyz"}}' \
+  "🌳feature-xyz"
+
+assert_contains "a4-worktree-name" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"wt-x"}}' \
+  "🌳wt-x"
+
+assert_contains "a4-priority" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"wt-x"},"workspace":{"git_worktree":"wt-a"}}' \
+  "🌳wt-x"
+
+assert_not_contains "a4-priority-loser-absent" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"wt-x"},"workspace":{"git_worktree":"wt-a"}}' \
+  "wt-a"
+
+assert_not_contains "a4-no-worktree" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "🌳"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
