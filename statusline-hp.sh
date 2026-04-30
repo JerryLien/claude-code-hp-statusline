@@ -10,7 +10,7 @@ input=$(cat)
 
 # Parse all values in one python3 call (no jq needed)
 eval "$(INPUT="$input" python3 -c '
-import json, os, re, sys, time
+import json, os, sys, time
 
 try:
     d = json.loads(os.environ.get("INPUT", "{}"))
@@ -61,13 +61,45 @@ five_h = g(d, "rate_limits", "five_hour", "used_percentage")
 seven_d = g(d, "rate_limits", "seven_day", "used_percentage")
 fh_reset = g(d, "rate_limits", "five_hour", "resets_at")
 sd_reset = g(d, "rate_limits", "seven_day", "resets_at")
+
+def is_cooldown(v):
+    if v is None: return 0
+    try:
+        return 1 if float(v) >= 100.0 else 0
+    except (TypeError, ValueError):
+        return 0
+
+is_5h_cooldown = is_cooldown(five_h)
+is_7d_cooldown = is_cooldown(seven_d)
+
+def trunc_pct(v):
+    if v is None: return ""
+    try:
+        return str(int(float(v)))  # truncate toward zero
+    except (TypeError, ValueError):
+        return ""
+five_h_int = trunc_pct(five_h)
+seven_d_int = trunc_pct(seven_d)
+
 cost = g(d, "cost", "total_cost_usd")
 lines_add = g(d, "cost", "total_lines_added") or 0
 lines_del = g(d, "cost", "total_lines_removed") or 0
 version = g(d, "version") or ""
 vim_mode = g(d, "vim", "mode") or ""
 agent_name = g(d, "agent", "name") or ""
+output_style = g(d, "output_style", "name") or ""
+session_name = g(d, "session_name") or ""
+wt_name = g(d, "worktree", "name") or g(d, "workspace", "git_worktree") or ""
+cwd = g(d, "workspace", "current_dir") or g(d, "cwd") or ""
+home = os.path.expanduser("~")
+if cwd == home:
+    workspace_dir = "~"
+elif cwd:
+    workspace_dir = os.path.basename(cwd)
+else:
+    workspace_dir = ""
 api_dur = fmt_ms(g(d, "cost", "total_api_duration_ms"))
+wall_dur = fmt_ms(g(d, "cost", "total_duration_ms"))
 exceeds_200k = 1 if g(d, "exceeds_200k_tokens") else 0
 
 cu = g(d, "context_window", "current_usage") or {}
@@ -77,6 +109,13 @@ it = cu.get("input_tokens") or 0
 _cache_total = cr + cc + it
 cache_pct = int(cr * 100 / _cache_total) if _cache_total > 0 else -1
 
+ctx_size = g(d, "context_window", "context_window_size") or 0
+is_1m_ctx = 1 if ctx_size >= 1_000_000 else 0
+thinking_on = 1 if g(d, "thinking", "enabled") else 0
+
+# Live effort from spec (reflects mid-session /effort changes).
+# Falls back to settings.json for models that omit effort.level (e.g. Haiku).
+runtime_effort = (g(d, "effort", "level") or "").lower()
 settings_effort = ""
 theme_file = ""
 try:
@@ -87,35 +126,7 @@ try:
 except:
     pass
 
-# /model command writes effort to session state, not settings.json.
-# Extract the most recent effort from transcript as an override.
-# Anchor on "Set model to ... with X effort" to avoid matching conversation text.
-transcript_effort = ""
-effort_warning = 0
-VALID_EFFORTS = ("low", "medium", "high", "xhigh", "max")
-tp = d.get("transcript_path")
-if tp:
-    try:
-        # Cap at 5MB tail — long sessions can exceed this but /model is usually
-        # in the recent history. Reading 5MB of text + regex is ~50ms, acceptable.
-        size = os.path.getsize(tp)
-        with open(tp, "rb") as f:
-            if size > 5_000_000:
-                f.seek(-5_000_000, 2)
-            tail = f.read().decode("utf-8", errors="replace")
-        # Require ANSI escape around the effort value — real /model output always
-        # has bold formatting, while conversational text about /model does not.
-        matches = re.findall(r"<local-command-stdout>Set model to[^<]*?with\s*\\u001b\[[\d;]*m([a-z]+)\\u001b", tail)
-        if matches:
-            candidate = matches[-1].lower()
-            if candidate in VALID_EFFORTS:
-                transcript_effort = candidate
-            else:
-                effort_warning = 1
-    except:
-        pass
-
-effort = transcript_effort or settings_effort
+effort = runtime_effort or settings_effort
 
 # Latest version from the Claude Code changelog cache
 latest_version = ""
@@ -156,10 +167,20 @@ print(f"NEEDS_UPDATE={needs_update}")
 print(f"VIM_MODE=\"{sh(vim_mode)}\"")
 print(f"AGENT_NAME=\"{sh(agent_name)}\"")
 print(f"API_DURATION=\"{api_dur}\"")
+print(f"WALL_TIME=\"{wall_dur}\"")
 print(f"EXCEEDS_200K={exceeds_200k}")
 print(f"CACHE_PCT={cache_pct}")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
-print(f"EFFORT_WARNING={effort_warning}")
+print(f"IS_1M_CTX={is_1m_ctx}")
+print(f"THINKING_ON={thinking_on}")
+print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
+print(f"SESSION_NAME=\"{sh(session_name)}\"")
+print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
+print(f"WORKSPACE_DIR=\"{sh(workspace_dir)}\"")
+print(f"IS_5H_COOLDOWN={is_5h_cooldown}")
+print(f"IS_7D_COOLDOWN={is_7d_cooldown}")
+print(f"FIVE_H_INT=\"{five_h_int}\"")
+print(f"SEVEN_D_INT=\"{seven_d_int}\"")
 ' 2>/dev/null)"
 
 THEME="${STATUSLINE_THEME:-${THEME_FILE:-rpg}}"
@@ -191,12 +212,19 @@ case "$THEME" in
     BAR_EMPTY="·"
     CTX_ICON="🍄"
     COST_ICON="🌕"
-    EFFORT_MAX="⚫"
-    EFFORT_XHIGH="🟣"
-    EFFORT_HIGH="🔴"
-    EFFORT_MED="🟡"
-    EFFORT_LOW="🔵"
+    EFFORT_MAX="⚫ max"
+    EFFORT_XHIGH="🟣 xhigh"
+    EFFORT_HIGH="🔴 high"
+    EFFORT_MED="🟡 medium"
+    EFFORT_LOW="🔵 low"
+    EFFORT_MAX_STYLE="\033[7m"
+    EFFORT_XHIGH_STYLE=""
+    EFFORT_HIGH_STYLE=""
+    EFFORT_MED_STYLE=""
+    EFFORT_LOW_STYLE=""
     CAST_ICON="🌿"
+    STYLE_ICON="🌻"
+    COOLDOWN_ICON="💤"
     BAR_INVERTED=1       # flowers = used, dots = remaining
     ;;
   *)
@@ -206,12 +234,19 @@ case "$THEME" in
     BAR_EMPTY="░"
     CTX_ICON="🧠"
     COST_ICON="💰"
-    EFFORT_MAX="★M"
-    EFFORT_XHIGH="⇈X"
-    EFFORT_HIGH="↑H"
-    EFFORT_MED="~M"
-    EFFORT_LOW="↓L"
+    EFFORT_MAX="★max"
+    EFFORT_XHIGH="⇈xhigh"
+    EFFORT_HIGH="↑high"
+    EFFORT_MED="~medium"
+    EFFORT_LOW="↓low"
+    EFFORT_MAX_STYLE="\033[7m${BOLD}${MAGENTA}"
+    EFFORT_XHIGH_STYLE="${BOLD}${MAGENTA}"
+    EFFORT_HIGH_STYLE="${BRIGHT_RED}"
+    EFFORT_MED_STYLE="${BRIGHT_YELLOW}"
+    EFFORT_LOW_STYLE="${GRAY}"
     CAST_ICON="🔮"
+    STYLE_ICON="📖"
+    COOLDOWN_ICON="⏳"
     ;;
 esac
 
@@ -233,6 +268,7 @@ status_bar() {
   local width=${2:-20}
   local label=$3
   local reset_time=$4
+  local reset_icon=${5:-↻}
 
   # Clamp to [0, 100]
   [ "$used_pct" -lt 0 ] && used_pct=0
@@ -249,7 +285,7 @@ status_bar() {
   local bar_empty=""
 
   local reset_str=""
-  [ -n "$reset_time" ] && reset_str=" ${GRAY}↻${reset_time}${RESET}"
+  [ -n "$reset_time" ] && reset_str=" ${GRAY}${reset_icon}${reset_time}${RESET}"
 
   if [ "${BAR_INVERTED:-0}" = "1" ]; then
     # Inverted: flowers = used portion, dots = remaining
@@ -297,83 +333,140 @@ ctx_bar() {
   fi
 }
 
-# Build output
-parts=""
+# Build output — split into two rows for responsive multi-line
+parts_row1=""
+parts_row2=""
 
 # Model name + effort level
 EFFORT_ICON=""
 if [[ "$MODEL" != *"Haiku"* ]] && [ -n "$EFFORT" ]; then
   # Case-insensitive match so "Max"/"max"/"MAX" all work
   case "${EFFORT,,}" in
-    max)    EFFORT_ICON="${BOLD}${MAGENTA}${EFFORT_MAX}${RESET}" ;;
-    xhigh)  EFFORT_ICON="${MAGENTA}${EFFORT_XHIGH}${RESET}" ;;
-    high)   EFFORT_ICON="${BRIGHT_RED}${EFFORT_HIGH}${RESET}" ;;
-    medium) EFFORT_ICON="${BRIGHT_YELLOW}${EFFORT_MED}${RESET}" ;;
-    low)    EFFORT_ICON="${GRAY}${EFFORT_LOW}${RESET}" ;;
+    max)    EFFORT_ICON="${EFFORT_MAX_STYLE}${EFFORT_MAX}${RESET}" ;;
+    xhigh)  EFFORT_ICON="${EFFORT_XHIGH_STYLE}${EFFORT_XHIGH}${RESET}" ;;
+    high)   EFFORT_ICON="${EFFORT_HIGH_STYLE}${EFFORT_HIGH}${RESET}" ;;
+    medium) EFFORT_ICON="${EFFORT_MED_STYLE}${EFFORT_MED}${RESET}" ;;
+    low)    EFFORT_ICON="${EFFORT_LOW_STYLE}${EFFORT_LOW}${RESET}" ;;
   esac
 fi
 
-parts+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
-[ -n "$AGENT_NAME" ] && parts+="${GRAY}·${AGENT_NAME}${RESET}"
-[ -n "$EFFORT_ICON" ] && parts+=" ${EFFORT_ICON}"
-# Loud warning: /model output in transcript didn't match expected format
-[ "${EFFORT_WARNING:-0}" = "1" ] && parts+=" ${BRIGHT_RED}⚠effort${RESET}"
+parts_row1+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
+[ "${IS_1M_CTX:-0}" = "1" ] && parts_row1+="${CYAN}[1M]${RESET}"
+[ "${THINKING_ON:-0}" = "1" ] && parts_row1+=" ${MAGENTA}💭${RESET}"
+[ -n "$WORKSPACE_DIR" ] && parts_row1+=" ${CYAN}📁 ${WORKSPACE_DIR}${RESET}"
+[ -n "$SESSION_NAME" ] && parts_row1+=" ${GRAY}#${SESSION_NAME}${RESET}"
+[ -n "$WORKTREE_NAME" ] && parts_row1+=" ${GREEN}🌳${WORKTREE_NAME}${RESET}"
+[ -n "$AGENT_NAME" ] && parts_row1+="${GRAY}·${AGENT_NAME}${RESET}"
+[ -n "$EFFORT_ICON" ] && parts_row1+=" ${EFFORT_ICON}"
+if [ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ]; then
+  parts_row1+=" ${CYAN}${STYLE_ICON}${OUTPUT_STYLE}${RESET}"
+fi
 
 # Vim mode
 if [ -n "$VIM_MODE" ]; then
-  parts+="  ${GRAY}⌨${VIM_MODE:0:1}${RESET}"
+  parts_row1+="  ${GRAY}⌨${VIM_MODE:0:1}${RESET}"
 fi
 
 # Usage bars (only if available — API users won't have these)
 if [ -n "$FIVE_H" ]; then
-  five_int=$(printf "%.0f" "$FIVE_H" 2>/dev/null || echo "0")
-  parts+="  $(status_bar "$five_int" 15 "$LABEL_5H" "$FH_RESET")"
+  fh_icon="↻"; [ "${IS_5H_COOLDOWN:-0}" = "1" ] && fh_icon="$COOLDOWN_ICON"
+  parts_row2+="  $(status_bar "${FIVE_H_INT:-0}" 15 "$LABEL_5H" "$FH_RESET" "$fh_icon")"
 fi
 
 if [ -n "$SEVEN_D" ]; then
-  seven_int=$(printf "%.0f" "$SEVEN_D" 2>/dev/null || echo "0")
-  parts+="  $(status_bar "$seven_int" 15 "$LABEL_7D" "$SD_RESET")"
+  sd_icon="↻"; [ "${IS_7D_COOLDOWN:-0}" = "1" ] && sd_icon="$COOLDOWN_ICON"
+  parts_row2+="  $(status_bar "${SEVEN_D_INT:-0}" 15 "$LABEL_7D" "$SD_RESET" "$sd_icon")"
 fi
 
 # Context window
-parts+="  $(ctx_bar "$CTX")"
+parts_row2+="  $(ctx_bar "$CTX")"
 
 # Cache hit ratio
 if [ "${CACHE_PCT:-"-1"}" -ge 0 ] 2>/dev/null; then
   if [ "$CACHE_PCT" -ge 70 ]; then cache_color="$BRIGHT_GREEN"
   elif [ "$CACHE_PCT" -ge 30 ]; then cache_color="$BRIGHT_YELLOW"
   else cache_color="$BRIGHT_RED"; fi
-  parts+=" ${cache_color}⚡${CACHE_PCT}%${RESET}"
+  parts_row2+=" ${cache_color}⚡${CACHE_PCT}%${RESET}"
 fi
 
 # 200k threshold warning
 if [ "${EXCEEDS_200K:-0}" = "1" ]; then
-  parts+=" ${BRIGHT_RED}⚠200k${RESET}"
+  parts_row2+=" ${BRIGHT_RED}⚠200k${RESET}"
 fi
 
 # API casting time
 if [ -n "$API_DURATION" ]; then
-  parts+="  ${MAGENTA}${CAST_ICON} ${API_DURATION}${RESET}"
+  parts_row2+="  ${MAGENTA}${CAST_ICON} ${API_DURATION}"
+  [ -n "$WALL_TIME" ] && parts_row2+="/${WALL_TIME}"
+  parts_row2+="${RESET}"
 fi
 
 # Cost
 if [ -n "$COST" ]; then
-  parts+="  ${MAGENTA}${COST_ICON} \$${COST}${RESET}"
+  parts_row2+="  ${MAGENTA}${COST_ICON} \$${COST}${RESET}"
 fi
 
 # Lines changed
 if [ "$LINES_ADD" -gt 0 ] 2>/dev/null || [ "$LINES_DEL" -gt 0 ] 2>/dev/null; then
-  parts+="  ${GREEN}+${LINES_ADD}${RESET}/${RED}-${LINES_DEL}${RESET}"
+  parts_row2+="  ${GREEN}+${LINES_ADD}${RESET}/${RED}-${LINES_DEL}${RESET}"
 fi
 
 # Version (highlight if newer release available)
 if [ -n "$VERSION" ]; then
   if [ "${NEEDS_UPDATE:-0}" = "1" ]; then
     # Yellow background, black text — eye-catching but not alarming
-    parts+="  \033[43m\033[30m v${VERSION}→${LATEST_VERSION} \033[0m"
+    parts_row2+="  \033[43m\033[30m v${VERSION}→${LATEST_VERSION} \033[0m"
   else
-    parts+="  ${GRAY}v${VERSION}${RESET}"
+    parts_row2+="  ${GRAY}v${VERSION}${RESET}"
   fi
 fi
 
-echo -e "$parts"
+# Responsive output: single line if it fits, else 2 rows
+if [ -z "$parts_row1" ]; then
+  echo -e "$parts_row2"
+elif [ -z "$parts_row2" ]; then
+  echo -e "$parts_row1"
+else
+  cols=${COLUMNS:-$(tput cols 2>/dev/null || echo 120)}
+  # Sanitize: non-numeric values fall back to a safe default (matches spec)
+  case "$cols" in
+    ''|*[!0-9]*) cols=120 ;;
+  esac
+  # Fast path: very wide terminal → single line definitely fits, skip measurement
+  if [ "$cols" -ge 200 ]; then
+    echo -e "${parts_row1}  ${parts_row2}"
+  else
+    # Measure display width of each row via python3
+    widths=$(printf '%s\n%s' "$parts_row1" "$parts_row2" | python3 -c '
+import sys, re, unicodedata
+# Match both actual ESC byte (\x1b) and literal backslash-0-3-3 (\033)
+ANSI_RE = re.compile(r"(?:\x1b|\\033)\[[0-9;]*m")
+def dw(s):
+    s = ANSI_RE.sub("", s)
+    w = 0
+    for ch in s:
+        if unicodedata.category(ch).startswith("M"):
+            continue
+        if unicodedata.east_asian_width(ch) in ("W", "F"):
+            w += 2
+            continue
+        if ord(ch) >= 0x2600:
+            w += 2
+            continue
+        w += 1
+    return w
+for line in sys.stdin.read().split("\n")[:2]:
+    print(dw(line))
+' 2>/dev/null)
+    row1_w=$(echo "$widths" | sed -n "1p")
+    row2_w=$(echo "$widths" | sed -n "2p")
+    # Single-line total = row1 + "  " (2 cells) + row2, plus 4 cells safety margin
+    total_w=$(( ${row1_w:-0} + ${row2_w:-0} + 2 + 4 ))
+    if [ "$total_w" -gt "$cols" ]; then
+      echo -e "$parts_row1"
+      echo -e "$parts_row2"
+    else
+      echo -e "${parts_row1}  ${parts_row2}"
+    fi
+  fi
+fi
