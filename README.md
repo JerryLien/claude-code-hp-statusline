@@ -31,7 +31,9 @@ The default status line tells you very little. This one turns everything that ma
 
 ### Always visible
 
-- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / max). RPG: ↓low / ~medium / ↑high / ⇈xhigh / ★max · Bloom: 🔵 low / 🟡 medium / 🔴 high / 🟣 xhigh / ⚫ max. Auto-syncs with `/model` selections mid-session, not just the saved default in `settings.json`
+- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / max). RPG: ↓low / ~medium / ↑high / ⇈xhigh / ★max · Bloom: 🔵 low / 🟡 medium / 🔴 high / 🟣 xhigh / ⚫ max. Reads the live `effort.level` from Claude Code, so mid-session `/effort` changes show up immediately. Falls back to `effortLevel` in `settings.json` for models that don't expose effort
+- **[1M] badge** — Cyan `[1M]` next to the model name when the session is running with a 1M-token context window (`context_window.context_window_size >= 1000000`). Hidden for the 200k default
+- **💭 Thinking** — Magenta thought-bubble next to the model name when extended thinking is enabled for the session
 - **Output style** — Current output style name when set to a non-default value (📖 RPG · 🌻 Bloom)
 - **Session name** — `#<name>` when the session was named via `--name` or `/rename`, helpful for juggling multiple sessions
 - **Worktree** — `🌳<name>` when working inside a linked git worktree (prefers `worktree.name` from `--worktree` sessions, falls back to `workspace.git_worktree`)
@@ -52,7 +54,6 @@ The default status line tells you very little. This one turns everything that ma
 - **⚠ 200k** — Red warning badge when the session crosses the 200k-token threshold (where per-token pricing jumps)
 - **🔮 / 🌿 Casting time + wall time** — Total time spent waiting on Claude API responses, followed by total session wall time (e.g. `🔮 2m14s/45m`). RPG: 🔮 crystal ball · Bloom: 🌿 growing plant
 - **v2.1.100→2.1.105** — Version badge goes yellow-highlighted with the target version when a newer release is detected in Claude Code's local changelog cache
-- **⚠effort** — Red badge appears next to the effort icon if the `/model` output format ever drifts from the expected pattern (so you know the parser needs a tweak)
 - **⏳ / 💤 Cooldown** — When a rate limit hits 100%, the reset countdown icon changes (⏳ RPG · 💤 Bloom) to signal the countdown is to cooldown lift, not a full window reset
 - **Effort gradient** — Extreme effort levels get progressively stronger visual treatment. RPG: `xhigh` = bold magenta · `max` = reverse-video highlight. Bloom: `max` = reverse-video highlight on the circle (emoji don't respond to bold)
 

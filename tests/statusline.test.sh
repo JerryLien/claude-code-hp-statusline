@@ -317,6 +317,55 @@ assert_contains_effort "effort-word-high-bloom" "high" "bloom" \
   '{"model":{"display_name":"Opus"}}' \
   "🔴 high"
 
+# C1 effort.level (spec field) — runtime overrides settings.json
+assert_contains_effort "c1-runtime-overrides-settings-rpg" "low" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"max"}}' \
+  "★max"
+
+assert_not_contains_effort "c1-runtime-overrides-settings-not-low" "low" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"max"}}' \
+  "↓low"
+
+# C1 case-insensitive (spec returns lower-case but be defensive)
+assert_contains "c1-effort-uppercase" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"HIGH"}}' \
+  "↑high"
+
+# C1 settings fallback when effort.level absent
+assert_contains_effort "c1-settings-fallback" "high" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "↑high"
+
+# C2 thinking.enabled
+assert_contains "c2-thinking-on-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"thinking":{"enabled":true}}' \
+  "💭"
+
+assert_contains "c2-thinking-on-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"thinking":{"enabled":true}}' \
+  "💭"
+
+assert_not_contains "c2-thinking-off" "rpg" \
+  '{"model":{"display_name":"Opus"},"thinking":{"enabled":false}}' \
+  "💭"
+
+assert_not_contains "c2-thinking-absent" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "💭"
+
+# C3 1M context window badge
+assert_contains "c3-1m-badge" "rpg" \
+  '{"model":{"display_name":"Opus"},"context_window":{"context_window_size":1000000}}' \
+  "[1M]"
+
+assert_not_contains "c3-200k-no-badge" "rpg" \
+  '{"model":{"display_name":"Opus"},"context_window":{"context_window_size":200000}}' \
+  "[1M]"
+
+assert_not_contains "c3-no-size-no-badge" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "[1M]"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
