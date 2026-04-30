@@ -3,11 +3,11 @@
 > Turn your [Claude Code](https://claude.com/claude-code) status line into a game HUD. See usage limits as health bars, catch cache-miss regressions instantly, and get a loud heads-up the moment a new release drops.
 
 ```
-⚔ Opus ↑H  ❤ 5h [█████████░░░░░░] 65% ↻2h29m  ❤ 7d [████░░░░░░░░░░░] 28% ↻1d4h  🧠 ▮▮▮▮▯▯▯▯▯▯ 42% ⚡87%  🔮 2m14s  💰 $2.80  +87/-12  v2.1.105
+⚔ Opus[1M] 💭 📁 my-project ↑high  ❤ 5h [█████████░░░░░░] 65% ↻2h29m  ❤ 7d [████░░░░░░░░░░░] 28% ↻1d4h  🧠 ▮▮▮▮▯▯▯▯▯▯ 42% ⚡87%  🔮 2m14s/45m  💰 $2.80  +87/-12  v2.1.105
 ```
 
 ```
-🌱 Opus 🔴  5h 🌸🌸🌸🌸🌸·········· 35% ↻2h29m  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72% ↻1d4h  🍄 🌸🌸🌸🌸······ 42% ⚡87%  🌿 2m14s  🌕 $2.80  +87/-12  v2.1.105
+🌱 Opus[1M] 💭 📁 my-project 🔴 high  5h 🌸🌸🌸🌸🌸·········· 35% ↻2h29m  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72% ↻1d4h  🍄 🌸🌸🌸🌸······ 42% ⚡87%  🌿 2m14s/45m  🌕 $2.80  +87/-12  v2.1.105
 ```
 
 ## Why?
@@ -24,6 +24,8 @@ The default status line tells you very little. This one turns everything that ma
 - 💰 **Session cost** — equivalent API cost, even on Pro/Max subscriptions
 - 📈 **Lines changed** — `+/-` counter for edits made in this session
 - 🆕 **Update alert** — version number flips to a yellow badge the instant a newer release hits your local changelog cache
+- 📁 **Workspace + worktree** — Current dir basename and `--worktree` name always visible
+- 💭 / **[1M]** **Model state indicators** — Shows when extended thinking is on or when running with a 1M-token context window
 - 🎨 **Two themes** — classic RPG (`⚔❤█░`) or peaceful Bloom garden (`🌱🌸🍄🌕`)
 - 📏 **Responsive layout** — auto-wraps into 2 rows (identity / metrics) when the terminal is too narrow, stays single-line on wide screens
 
@@ -95,6 +97,51 @@ Add to `~/.claude/settings.json`:
   }
 }
 ```
+
+## Stay up to date (optional)
+
+Opt in to a non-intrusive update notification: a cyan `📦 sl→X.Y.Z` badge appears
+on the statusline when a newer release is published, and `/statusline-update`
+upgrades in place.
+
+**1.** Drop the update-check hook + `/statusline-update` slash command into your config:
+
+```bash
+# Hook that background-fetches the latest VERSION on session start
+mkdir -p ~/.claude/hooks
+curl -fsSL -o ~/.claude/hooks/check-statusline-update.sh \
+  https://raw.githubusercontent.com/JerryLien/claude-code-hp-statusline/main/hooks/check-update.sh
+chmod +x ~/.claude/hooks/check-statusline-update.sh
+
+# Slash command that performs the upgrade in place
+mkdir -p ~/.claude/commands
+curl -fsSL -o ~/.claude/commands/statusline-update.md \
+  https://raw.githubusercontent.com/JerryLien/claude-code-hp-statusline/main/commands/statusline-update.md
+```
+
+**2.** Wire the hook in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "$HOME/.claude/hooks/check-statusline-update.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook caps the network call at 2 seconds, runs detached so session start is
+never blocked, and skips entirely if the cache was refreshed within the last
+6 hours. If GitHub is unreachable it silently no-ops — the statusline keeps
+working as if the feature was off.
+
+**3.** When the badge appears, type `/statusline-update` and Claude will run the
+upgrade for you. The previous version is kept at `~/.claude/statusline-hp.sh.bak`.
 
 ## Switch theme
 

@@ -366,6 +366,68 @@ assert_not_contains "c3-no-size-no-badge" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "[1M]"
 
+# Helper: run statusline with a latest-version cache file present
+run_with_sl_latest() {
+  local latest=$1 theme=$2 json=$3
+  local tmp output status
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/statusline.XXXXXX") || return 1
+  mkdir -p "$tmp/.claude/cache"
+  printf '%s\n' "$latest" > "$tmp/.claude/cache/statusline-hp.latest-version"
+  output=$(printf '%s\n' "$json" | HOME="$tmp" STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1)
+  status=$?
+  rm -rf "$tmp"
+  printf '%s' "$output"
+  return $status
+}
+
+assert_sl_contains() {
+  local name=$1 latest=$2 theme=$3 json=$4 pattern=$5
+  local output
+  output=$(run_with_sl_latest "$latest" "$theme" "$json")
+  if echo "$output" | grep -qF "$pattern"; then
+    PASS=$((PASS + 1))
+    echo "PASS: $name"
+  else
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES+=("$name")
+    echo "FAIL: $name"
+    echo "  Output:  $output"
+  fi
+}
+
+assert_sl_not_contains() {
+  local name=$1 latest=$2 theme=$3 json=$4 pattern=$5
+  local output
+  output=$(run_with_sl_latest "$latest" "$theme" "$json")
+  if echo "$output" | grep -qF "$pattern"; then
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES+=("$name")
+    echo "FAIL: $name (unexpected match)"
+    echo "  Output:  $output"
+  else
+    PASS=$((PASS + 1))
+    echo "PASS: $name"
+  fi
+}
+
+# C4 statusline self-update badge
+assert_sl_contains "c4-newer-shows-badge" "9.9.9" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "📦 sl→9.9.9"
+
+assert_sl_not_contains "c4-equal-no-badge" "0.3.0" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "📦"
+
+assert_sl_not_contains "c4-older-no-badge" "0.0.1" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "📦"
+
+# Cache absent should not break or show badge
+assert_not_contains "c4-no-cache-no-badge" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "📦"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"

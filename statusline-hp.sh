@@ -6,6 +6,11 @@
 # Themes: "rpg" (default), "bloom"
 # Set theme in ~/.claude/settings.json:  "env": { "STATUSLINE_THEME": "bloom" }
 
+# Bump on each release; the companion update-check hook compares this
+# against the latest VERSION file on GitHub.
+STATUSLINE_HP_VERSION="0.3.0"
+export STATUSLINE_HP_VERSION
+
 input=$(cat)
 
 # Parse all values in one python3 call (no jq needed)
@@ -147,6 +152,19 @@ def parse_v(v):
 
 needs_update = 1 if (version and latest_version and parse_v(version) < parse_v(latest_version)) else 0
 
+# Self-update check for the statusline script itself.
+# The companion SessionStart hook (hooks/check-update.sh) periodically writes
+# the latest published VERSION to this cache file. We compare to our own
+# embedded version and flag if newer.
+sl_installed_version = os.environ.get("STATUSLINE_HP_VERSION", "")
+sl_latest_version = ""
+try:
+    with open(os.path.expanduser("~/.claude/cache/statusline-hp.latest-version")) as f:
+        sl_latest_version = f.read().strip()
+except:
+    pass
+sl_needs_update = 1 if (sl_installed_version and sl_latest_version and parse_v(sl_installed_version) < parse_v(sl_latest_version)) else 0
+
 fh = five_h if five_h is not None else ""
 sd = seven_d if seven_d is not None else ""
 c = f"{cost:.4f}" if isinstance(cost, (int, float)) else ""
@@ -177,6 +195,8 @@ print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
 print(f"SESSION_NAME=\"{sh(session_name)}\"")
 print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
 print(f"WORKSPACE_DIR=\"{sh(workspace_dir)}\"")
+print(f"SL_LATEST_VERSION=\"{sh(sl_latest_version)}\"")
+print(f"SL_NEEDS_UPDATE={sl_needs_update}")
 print(f"IS_5H_COOLDOWN={is_5h_cooldown}")
 print(f"IS_7D_COOLDOWN={is_7d_cooldown}")
 print(f"FIVE_H_INT=\"{five_h_int}\"")
@@ -419,6 +439,11 @@ if [ -n "$VERSION" ]; then
   else
     parts_row2+="  ${GRAY}v${VERSION}${RESET}"
   fi
+fi
+
+# Statusline-hp self-update badge (dim cyan box → /statusline-update)
+if [ "${SL_NEEDS_UPDATE:-0}" = "1" ]; then
+  parts_row2+="  \033[46m\033[30m 📦 sl→${SL_LATEST_VERSION} \033[0m"
 fi
 
 # Responsive output: single line if it fits, else 2 rows
