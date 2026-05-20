@@ -38,7 +38,8 @@ The default status line tells you very little. This one turns everything that ma
 - **💭 Thinking** — Magenta thought-bubble next to the model name when extended thinking is enabled for the session
 - **Output style** — Current output style name when set to a non-default value (📖 RPG · 🌻 Bloom)
 - **Session name** — `#<name>` when the session was named via `--name` or `/rename`, helpful for juggling multiple sessions
-- **Worktree** — `🌳<name>` when working inside a linked git worktree (prefers `worktree.name` from `--worktree` sessions, falls back to `workspace.git_worktree`)
+- **Worktree** — `🌳<name>` when working inside a linked git worktree (prefers `worktree.name` from `--worktree` sessions, falls back to `workspace.git_worktree`). Appends `⎇<branch>` in dim gray when the worktree's git branch is known
+- **Added dirs** — `+N` after the workspace dir name when extra directories are mounted via `/add-dir` (e.g., `📁 myproj+2` = working in `myproj` with 2 extra dirs in scope)
 - **Context** — Context window usage (🧠 or 🍄)
 - **Cost** — Session cost in USD. For Pro/Max subscribers, this shows the **equivalent API cost** — a fun way to see how much value you're getting from your subscription
 - **+N/-N** — Lines of code added/removed this session
