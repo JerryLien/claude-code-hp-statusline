@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.3.0"
+STATUSLINE_HP_VERSION="0.4.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -95,6 +95,10 @@ agent_name = g(d, "agent", "name") or ""
 output_style = g(d, "output_style", "name") or ""
 session_name = g(d, "session_name") or ""
 wt_name = g(d, "worktree", "name") or g(d, "workspace", "git_worktree") or ""
+# Branch only available under worktree.* (not workspace.git_worktree fallback)
+wt_branch = g(d, "worktree", "branch") or ""
+added_dirs = g(d, "workspace", "added_dirs") or []
+added_count = len(added_dirs) if isinstance(added_dirs, list) else 0
 cwd = g(d, "workspace", "current_dir") or g(d, "cwd") or ""
 home = os.path.expanduser("~")
 if cwd == home:
@@ -194,6 +198,8 @@ print(f"THINKING_ON={thinking_on}")
 print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
 print(f"SESSION_NAME=\"{sh(session_name)}\"")
 print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
+print(f"WORKTREE_BRANCH=\"{sh(wt_branch)}\"")
+print(f"ADDED_COUNT={added_count}")
 print(f"WORKSPACE_DIR=\"{sh(workspace_dir)}\"")
 print(f"SL_LATEST_VERSION=\"{sh(sl_latest_version)}\"")
 print(f"SL_NEEDS_UPDATE={sl_needs_update}")
@@ -373,9 +379,18 @@ fi
 parts_row1+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
 [ "${IS_1M_CTX:-0}" = "1" ] && parts_row1+="${CYAN}[1M]${RESET}"
 [ "${THINKING_ON:-0}" = "1" ] && parts_row1+=" ${MAGENTA}💭${RESET}"
-[ -n "$WORKSPACE_DIR" ] && parts_row1+=" ${CYAN}📁 ${WORKSPACE_DIR}${RESET}"
+if [ -n "$WORKSPACE_DIR" ]; then
+  if [ "${ADDED_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+    parts_row1+=" ${CYAN}📁 ${WORKSPACE_DIR}+${ADDED_COUNT}${RESET}"
+  else
+    parts_row1+=" ${CYAN}📁 ${WORKSPACE_DIR}${RESET}"
+  fi
+fi
 [ -n "$SESSION_NAME" ] && parts_row1+=" ${GRAY}#${SESSION_NAME}${RESET}"
-[ -n "$WORKTREE_NAME" ] && parts_row1+=" ${GREEN}🌳${WORKTREE_NAME}${RESET}"
+if [ -n "$WORKTREE_NAME" ]; then
+  parts_row1+=" ${GREEN}🌳${WORKTREE_NAME}${RESET}"
+  [ -n "$WORKTREE_BRANCH" ] && parts_row1+="${GRAY}⎇${WORKTREE_BRANCH}${RESET}"
+fi
 [ -n "$AGENT_NAME" ] && parts_row1+="${GRAY}·${AGENT_NAME}${RESET}"
 [ -n "$EFFORT_ICON" ] && parts_row1+=" ${EFFORT_ICON}"
 if [ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ]; then

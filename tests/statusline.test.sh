@@ -415,7 +415,7 @@ assert_sl_contains "c4-newer-shows-badge" "9.9.9" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "📦 sl→9.9.9"
 
-assert_sl_not_contains "c4-equal-no-badge" "0.3.0" "rpg" \
+assert_sl_not_contains "c4-equal-no-badge" "0.4.0" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "📦"
 
@@ -427,6 +427,41 @@ assert_sl_not_contains "c4-older-no-badge" "0.0.1" "rpg" \
 assert_not_contains "c4-no-cache-no-badge" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "📦"
+
+# D1 workspace.added_dirs — count badge after workspace dir
+assert_contains "d1-added-dirs-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/proj","added_dirs":["/tmp/a","/tmp/b"]}}' \
+  "📁 proj+2"
+
+assert_contains "d1-added-dirs-single" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/proj","added_dirs":["/tmp/a"]}}' \
+  "📁 proj+1"
+
+assert_not_contains "d1-added-dirs-empty" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/proj","added_dirs":[]}}' \
+  "+0"
+
+assert_not_contains "d1-added-dirs-missing" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/proj"}}' \
+  "proj+"
+
+# D2 worktree.branch — dim suffix after worktree name
+assert_contains "d2-worktree-branch" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"my-feature","branch":"worktree-my-feature"}}' \
+  "🌳my-feature"
+
+assert_contains "d2-worktree-branch-shows" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"my-feature","branch":"worktree-my-feature"}}' \
+  "⎇worktree-my-feature"
+
+assert_not_contains "d2-worktree-no-branch" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"my-feature"}}' \
+  "⎇"
+
+# D2 branch absent for workspace.git_worktree fallback (no branch field there)
+assert_not_contains "d2-git-worktree-no-branch" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"git_worktree":"feature-xyz"}}' \
+  "⎇"
 
 # --- Summary ---
 echo ""
