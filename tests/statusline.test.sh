@@ -463,6 +463,87 @@ assert_not_contains "d2-git-worktree-no-branch" "rpg" \
   '{"model":{"display_name":"Opus"},"workspace":{"git_worktree":"feature-xyz"}}' \
   "⎇"
 
+# === PR badge (pr.*) ===
+
+# Core render: approved -> icon + number + check, per theme
+assert_contains "pr-approved-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
+  "🔀#1234✓"
+
+assert_contains "pr-approved-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
+  "🌷#1234✓"
+
+# State glyphs (theme-agnostic), rpg icon
+assert_contains "pr-pending-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"pending"}}' \
+  "🔀#7…"
+
+assert_contains "pr-changes-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"changes_requested"}}' \
+  "🔀#7✗"
+
+assert_contains "pr-draft-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"draft"}}' \
+  "🔀#7✎"
+
+# Colour is conclusive for non-grey states in minimal JSON (no bars, ctx bar is cyan):
+# changes_requested -> BRIGHT_RED
+assert_contains "pr-changes-colour-red" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"changes_requested"}}' \
+  $'\033[91m'
+
+# approved -> BRIGHT_GREEN
+assert_contains "pr-approved-colour-green" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"approved"}}' \
+  $'\033[92m'
+
+# pending -> BRIGHT_YELLOW
+assert_contains "pr-pending-colour-yellow" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"pending"}}' \
+  $'\033[93m'
+
+# Review state absent -> number shows, neutral, NO glyph
+assert_contains "pr-no-review-number" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "🔀#1234"
+
+assert_not_contains "pr-no-review-no-checkglyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "✓"
+
+# Unknown review state -> safe degrade (no glyph), still shows number
+assert_contains "pr-unknown-review-number" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "🔀#1234"
+
+assert_not_contains "pr-unknown-review-no-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "✓"
+
+# No pr -> no badge (baseline regression)
+assert_not_contains "pr-absent-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "🔀"
+
+assert_not_contains "pr-absent-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"}}' \
+  "🌷"
+
+# pr present but number missing -> no badge
+assert_not_contains "pr-no-number-no-badge" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"review_state":"approved"}}' \
+  "🔀"
+
+# Position: PR badge after worktree, before agent
+assert_contains "pr-position-after-worktree" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"wt"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
+  "🌳wt"
+
+assert_contains "pr-position-badge-present" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"wt"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
+  "🔀#9✓"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
