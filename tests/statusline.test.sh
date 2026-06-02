@@ -512,6 +512,10 @@ assert_not_contains "pr-no-review-no-checkglyph" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
   "✓"
 
+assert_not_contains "pr-no-review-no-xglyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "✗"
+
 # Unknown review state -> safe degrade (no glyph), still shows number
 assert_contains "pr-unknown-review-number" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
@@ -535,14 +539,12 @@ assert_not_contains "pr-no-number-no-badge" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"review_state":"approved"}}' \
   "🔀"
 
-# Position: PR badge after worktree, before agent
-assert_contains "pr-position-after-worktree" "rpg" \
+# Position: PR badge sits after 🌳worktree and before ·agent (full ordering contract)
+# Pattern spans wt→RESET→space→GREEN→badge as a contiguous byte sequence, proving
+# the badge immediately follows the worktree segment (no reordering possible).
+assert_contains "pr-position-order" "rpg" \
   '{"model":{"display_name":"Opus"},"worktree":{"name":"wt"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
-  "🌳wt"
-
-assert_contains "pr-position-badge-present" "rpg" \
-  '{"model":{"display_name":"Opus"},"worktree":{"name":"wt"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
-  "🔀#9✓"
+  $'wt\033[0m \033[92m🔀#9✓'
 
 # --- Summary ---
 echo ""
