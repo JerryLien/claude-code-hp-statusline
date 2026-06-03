@@ -611,6 +611,17 @@ PR_LONGURL='{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":
 assert_single_line "pr-osc8-width-stripped" "80" "rpg" "$PR_LONGURL"
 assert_single_line "pr-osc8-width-stripped-bloom" "80" "bloom" "$PR_LONGURL"
 
+# === Version consistency ===
+# VERSION file must equal STATUSLINE_HP_VERSION in the script
+VERSION_FILE="$(cat "$SCRIPT_DIR/VERSION")"
+SCRIPT_VERSION="$(grep -E '^STATUSLINE_HP_VERSION=' "$STATUSLINE" | sed -E 's/.*"([^"]+)".*/\1/')"
+if [ "$VERSION_FILE" = "0.5.0" ] && [ "$SCRIPT_VERSION" = "0.5.0" ]; then
+  PASS=$((PASS + 1)); echo "PASS: version-consistency-0.5.0"
+else
+  FAIL=$((FAIL + 1)); FAILED_NAMES+=("version-consistency-0.5.0")
+  echo "FAIL: version-consistency-0.5.0 (VERSION=$VERSION_FILE SCRIPT=$SCRIPT_VERSION)"
+fi
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"

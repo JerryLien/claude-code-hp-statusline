@@ -25,6 +25,7 @@ The default status line tells you very little. This one turns everything that ma
 - 📈 **Lines changed** — `+/-` counter for edits made in this session
 - 🆕 **Update alert** — version number flips to a yellow badge the instant a newer release hits your local changelog cache
 - 📁 **Workspace + worktree** — Current dir basename and `--worktree` name always visible
+- 🔀 **PR badge** — Open PR for the current branch with review-state glyph + colour, click-to-open via OSC 8 link
 - 💭 / **[1M]** **Model state indicators** — Shows when extended thinking is on or when running with a 1M-token context window
 - 🎨 **Two themes** — classic RPG (`⚔❤█░`) or peaceful Bloom garden (`🌱🌸🍄🌕`)
 - 📏 **Responsive layout** — auto-wraps into 2 rows (identity / metrics) when the terminal is too narrow, stays single-line on wide screens
@@ -66,6 +67,7 @@ Only appear when the relevant data is present:
 
 - **⌨N / ⌨I** — Current vim mode (NORMAL / INSERT), when vim mode is enabled
 - **·agent** — Agent name when launched via `--agent`
+- **🔀#1234✓ / 🌷#1234✓ PR badge** — Open PR for the current branch (`pr.number`), placed right after the worktree block. Glyph + colour encode `pr.review_state`: `✓` approved (green), `…` pending (yellow), `✗` changes_requested (red), `✎` draft (grey); neutral cyan with no glyph when the review state is absent or unrecognised. When `pr.url` is set the badge is a clickable OSC 8 hyperlink (and the hidden URL is excluded from the responsive width calculation)
 
 ## Requirements
 
@@ -98,6 +100,24 @@ Add to `~/.claude/settings.json`:
   }
 }
 ```
+
+## Recommended settings
+
+Two `~/.claude/settings.json` tweaks make this status line behave better:
+
+```json
+{
+  "hideVimModeIndicator": true,
+  "refreshInterval": 10
+}
+```
+
+- **`hideVimModeIndicator`** — This script renders its own `⌨N` / `⌨I` vim
+  indicator, so hide Claude Code's built-in `-- INSERT --` line to avoid showing
+  the mode twice.
+- **`refreshInterval`** — This script shows live rate-limit reset countdowns
+  (`↻2h29m`). Setting a refresh interval (seconds) keeps them ticking while the
+  session is idle instead of freezing until your next action.
 
 ## Stay up to date (optional)
 

@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.4.0"
+STATUSLINE_HP_VERSION="0.5.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)

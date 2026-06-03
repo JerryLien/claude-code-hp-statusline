@@ -3,6 +3,15 @@
 All notable changes to `statusline-hp.sh`. Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 Versions are tagged in the `VERSION` file and embedded in the script as `STATUSLINE_HP_VERSION`.
 
+## [0.5.0] — 2026-06-03
+
+- `🔀#1234✓` (rpg) / `🌷#1234✓` (bloom) PR badge in row1 when an open PR exists for the current branch (`pr.number` / `pr.review_state`)
+- Review state shown as glyph + colour: `✓` approved (green), `…` pending (yellow), `✗` changes_requested (red), `✎` draft (grey); neutral cyan with no glyph when `review_state` is absent or unknown
+- Badge is a clickable OSC 8 hyperlink to `pr.url` (degrades to plain text on terminals without OSC 8 support); the string-terminator escaping is colour-safe so the badge colour survives next to the link
+- Width measurement now strips OSC 8 sequences so the hidden URL does not skew the responsive single-line / 2-row wrap decision
+- README: documented the PR badge plus `hideVimModeIndicator` and `refreshInterval` settings tips
+- +30 new tests covering the four review states, absent/unknown state, position ordering, no-url fallback, OSC 8 colour-safety, OSC 8 width equivalence, and version consistency (73 → 103)
+
 ## [0.4.0] — 2026-05-20
 
 - `📁 dir+N` count badge when `/add-dir` mounted extra directories (`workspace.added_dirs`)
