@@ -415,7 +415,17 @@ if [ "${PR_NUMBER:-0}" -gt 0 ] 2>/dev/null; then
     draft)             pr_glyph="✎"; pr_color="$GRAY" ;;
     *)                 pr_glyph="";  pr_color="$CYAN" ;;
   esac
-  parts_row1+=" ${pr_color}${PR_ICON}#${PR_NUMBER}${pr_glyph}${RESET}"
+  pr_text="${PR_ICON}#${PR_NUMBER}${pr_glyph}"
+  if [ -n "$PR_URL" ]; then
+    # OSC 8 hyperlink: ESC ] 8 ;; URL ST  <visible>  ESC ] 8 ;; ST   (ST = ESC backslash)
+    # ST is written \033\\\\ (not \033\\): in this double-quoted string that yields
+    # the literal bytes \033\\ , so echo -e consumes BOTH backslashes into ESC+\ and
+    # leaves the following colour escape (\033[..m) intact. With only \033\\ the ST
+    # steals the colour escape lead and the colour prints as literal text.
+    parts_row1+=" \033]8;;${PR_URL}\033\\\\${pr_color}${pr_text}${RESET}\033]8;;\033\\\\"
+  else
+    parts_row1+=" ${pr_color}${pr_text}${RESET}"
+  fi
 fi
 [ -n "$AGENT_NAME" ] && parts_row1+="${GRAY}·${AGENT_NAME}${RESET}"
 [ -n "$EFFORT_ICON" ] && parts_row1+=" ${EFFORT_ICON}"

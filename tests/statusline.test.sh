@@ -568,6 +568,40 @@ assert_contains "pr-position-before-agent" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
   $'\033[92m🔀#9✓\033[0m\033[90m·sec'
 
+# === PR badge OSC 8 clickable link (pr.url) ===
+
+# OSC 8 link present when pr.url is set
+assert_contains "pr-osc8-link" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/o/r/pull/1234"}}' \
+  "]8;;https://github.com/o/r/pull/1234"
+
+# Still shows the visible badge text alongside the link
+assert_contains "pr-osc8-text-still-shown" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/o/r/pull/1234"}}' \
+  "🔀#1234✓"
+
+# Colour must survive next to the link: the OSC 8 open + ST must be immediately
+# followed by the real GREEN escape (ESC[92m), NOT a literal "033[92m". This
+# catches the echo -e backslash-merge where the ST eats the colour escape lead.
+assert_contains "pr-osc8-colour-intact" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/o/r/pull/1234"}}' \
+  $'\033]8;;https://github.com/o/r/pull/1234\033\\\033[92m'
+
+# Close ST must not swallow the following agent colour either (agent abuts badge
+# with no leading space): link-close ST then GRAY then ·agent, contiguous.
+assert_contains "pr-osc8-close-keeps-agent-colour" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/o/r/pull/1234"},"agent":{"name":"sec"}}' \
+  $'\033]8;;\033\\\033[90m·sec'
+
+# No url -> no OSC 8 sequence, but badge still renders
+assert_not_contains "pr-no-url-no-osc8" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
+  "]8;;"
+
+assert_contains "pr-no-url-badge-shown" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
+  "🔀#1234✓"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
