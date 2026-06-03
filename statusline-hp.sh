@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.4.0"
+STATUSLINE_HP_VERSION="0.5.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -99,6 +99,16 @@ wt_name = g(d, "worktree", "name") or g(d, "workspace", "git_worktree") or ""
 wt_branch = g(d, "worktree", "branch") or ""
 added_dirs = g(d, "workspace", "added_dirs") or []
 added_count = len(added_dirs) if isinstance(added_dirs, list) else 0
+pr_number = g(d, "pr", "number")
+pr_url = g(d, "pr", "url") or ""
+pr_review = (g(d, "pr", "review_state") or "").lower()
+def pos_int(v):
+    try:
+        n = int(v)
+        return n if n > 0 else 0
+    except (TypeError, ValueError):
+        return 0
+pr_num_int = pos_int(pr_number)
 cwd = g(d, "workspace", "current_dir") or g(d, "cwd") or ""
 home = os.path.expanduser("~")
 if cwd == home:
@@ -200,6 +210,9 @@ print(f"SESSION_NAME=\"{sh(session_name)}\"")
 print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
 print(f"WORKTREE_BRANCH=\"{sh(wt_branch)}\"")
 print(f"ADDED_COUNT={added_count}")
+print(f"PR_NUMBER={pr_num_int}")
+print(f"PR_URL=\"{sh(pr_url)}\"")
+print(f"PR_REVIEW=\"{sh(pr_review)}\"")
 print(f"WORKSPACE_DIR=\"{sh(workspace_dir)}\"")
 print(f"SL_LATEST_VERSION=\"{sh(sl_latest_version)}\"")
 print(f"SL_NEEDS_UPDATE={sl_needs_update}")
@@ -251,6 +264,7 @@ case "$THEME" in
     CAST_ICON="🌿"
     STYLE_ICON="🌻"
     COOLDOWN_ICON="💤"
+    PR_ICON="🌷"
     BAR_INVERTED=1       # flowers = used, dots = remaining
     ;;
   *)
@@ -273,6 +287,7 @@ case "$THEME" in
     CAST_ICON="🔮"
     STYLE_ICON="📖"
     COOLDOWN_ICON="⏳"
+    PR_ICON="🔀"
     ;;
 esac
 
@@ -391,6 +406,27 @@ if [ -n "$WORKTREE_NAME" ]; then
   parts_row1+=" ${GREEN}🌳${WORKTREE_NAME}${RESET}"
   [ -n "$WORKTREE_BRANCH" ] && parts_row1+="${GRAY}⎇${WORKTREE_BRANCH}${RESET}"
 fi
+# PR badge — open PR for the current branch (pr.* fields)
+if [ "${PR_NUMBER:-0}" -gt 0 ] 2>/dev/null; then
+  case "$PR_REVIEW" in
+    approved)          pr_glyph="✓"; pr_color="$BRIGHT_GREEN" ;;
+    pending)           pr_glyph="…"; pr_color="$BRIGHT_YELLOW" ;;
+    changes_requested) pr_glyph="✗"; pr_color="$BRIGHT_RED" ;;
+    draft)             pr_glyph="✎"; pr_color="$GRAY" ;;
+    *)                 pr_glyph="";  pr_color="$CYAN" ;;
+  esac
+  pr_text="${PR_ICON}#${PR_NUMBER}${pr_glyph}"
+  if [ -n "$PR_URL" ]; then
+    # OSC 8 hyperlink: ESC ] 8 ;; URL ST  <visible>  ESC ] 8 ;; ST   (ST = ESC backslash)
+    # ST is written \033\\\\ (not \033\\): in this double-quoted string that yields
+    # the literal bytes \033\\ , so echo -e consumes BOTH backslashes into ESC+\ and
+    # leaves the following colour escape (\033[..m) intact. With only \033\\ the ST
+    # steals the colour escape lead and the colour prints as literal text.
+    parts_row1+=" \033]8;;${PR_URL}\033\\\\${pr_color}${pr_text}${RESET}\033]8;;\033\\\\"
+  else
+    parts_row1+=" ${pr_color}${pr_text}${RESET}"
+  fi
+fi
 [ -n "$AGENT_NAME" ] && parts_row1+="${GRAY}·${AGENT_NAME}${RESET}"
 [ -n "$EFFORT_ICON" ] && parts_row1+=" ${EFFORT_ICON}"
 if [ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ]; then
@@ -480,8 +516,16 @@ else
     widths=$(printf '%s\n%s' "$parts_row1" "$parts_row2" | python3 -c '
 import sys, re, unicodedata
 # Match both actual ESC byte (\x1b) and literal backslash-0-3-3 (\033)
+# Strip OSC 8 hyperlinks first: ESC ]8;; URL ST and ESC ]8;; ST (close). The ST
+# carries 1 or 2 trailing backslashes in this pre-echo form, so allow both. The
+# bracket is ]8;; (right bracket) so this never touches SGR [..m (left bracket).
+# The non-greedy .*? relies on sh() stripping backslashes from PR_URL, so no
+# \033 can appear inside the URL and each match stops at the open ST, not the
+# close one. If sh() ever stops stripping backslashes, revisit this.
+OSC8_RE = re.compile(r"(?:\x1b|\\033)\]8;;.*?(?:\x1b|\\033)\\{1,2}")
 ANSI_RE = re.compile(r"(?:\x1b|\\033)\[[0-9;]*m")
 def dw(s):
+    s = OSC8_RE.sub("", s)
     s = ANSI_RE.sub("", s)
     w = 0
     for ch in s:

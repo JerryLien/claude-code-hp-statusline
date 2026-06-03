@@ -463,6 +463,187 @@ assert_not_contains "d2-git-worktree-no-branch" "rpg" \
   '{"model":{"display_name":"Opus"},"workspace":{"git_worktree":"feature-xyz"}}' \
   "⎇"
 
+# === PR badge (pr.*) ===
+
+# Core render: approved -> icon + number + check, per theme
+assert_contains "pr-approved-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
+  "🔀#1234✓"
+
+assert_contains "pr-approved-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
+  "🌷#1234✓"
+
+# State glyphs (theme-agnostic), rpg icon
+assert_contains "pr-pending-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"pending"}}' \
+  "🔀#7…"
+
+assert_contains "pr-changes-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"changes_requested"}}' \
+  "🔀#7✗"
+
+assert_contains "pr-draft-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"draft"}}' \
+  "🔀#7✎"
+
+# Colour assertions pin the full colour+icon+number+glyph run rather than the
+# bare escape code, so they identify the badge unambiguously and stay conclusive
+# even if rate-limit fields (which reuse the same bright colours) are later added
+# to a test JSON.
+# changes_requested -> BRIGHT_RED
+assert_contains "pr-changes-colour-red" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"changes_requested"}}' \
+  $'\033[91m🔀#7✗'
+
+# approved -> BRIGHT_GREEN
+assert_contains "pr-approved-colour-green" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"approved"}}' \
+  $'\033[92m🔀#7✓'
+
+# pending -> BRIGHT_YELLOW
+assert_contains "pr-pending-colour-yellow" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"pending"}}' \
+  $'\033[93m🔀#7…'
+
+# draft -> GRAY (bare \033[90m is not conclusive: GRAY appears more than once)
+assert_contains "pr-draft-colour-gray" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"draft"}}' \
+  $'\033[90m🔀#7✎'
+
+# Bloom theme shares the same colour codes; pin one to guard the bloom render path.
+assert_contains "pr-approved-colour-green-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"approved"}}' \
+  $'\033[92m🌷#7✓'
+
+# Review state absent -> number shows, neutral, NO glyph
+assert_contains "pr-no-review-number" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "🔀#1234"
+
+assert_not_contains "pr-no-review-no-checkglyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "✓"
+
+assert_not_contains "pr-no-review-no-xglyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "✗"
+
+# Absent review_state must show NONE of the four state glyphs, not just the
+# check/x pair: guard the pending (…) and draft (✎) glyphs too.
+assert_not_contains "pr-no-review-no-ellipsis-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "…"
+
+assert_not_contains "pr-no-review-no-draft-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "✎"
+
+# Unknown review state -> safe degrade (no glyph), still shows number
+assert_contains "pr-unknown-review-number" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "🔀#1234"
+
+assert_not_contains "pr-unknown-review-no-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "✓"
+
+# An unrecognised state must not leak ANY of the other three glyphs either.
+assert_not_contains "pr-unknown-review-no-xglyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "✗"
+
+assert_not_contains "pr-unknown-review-no-ellipsis-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "…"
+
+assert_not_contains "pr-unknown-review-no-draft-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "✎"
+
+# No pr -> no badge (baseline regression)
+assert_not_contains "pr-absent-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "🔀"
+
+assert_not_contains "pr-absent-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"}}' \
+  "🌷"
+
+# pr present but number missing -> no badge
+assert_not_contains "pr-no-number-no-badge" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"review_state":"approved"}}' \
+  "🔀"
+
+# Position: PR badge sits after 🌳worktree and before ·agent (full ordering contract)
+# Pattern spans wt→RESET→space→GREEN→badge as a contiguous byte sequence, proving
+# the badge immediately follows the worktree segment (no reordering possible).
+assert_contains "pr-position-order" "rpg" \
+  '{"model":{"display_name":"Opus"},"worktree":{"name":"wt"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
+  $'wt\033[0m \033[92m🔀#9✓'
+
+# Other half of the contract: badge sits BEFORE ·agent even with no worktree.
+# Pattern spans badge→RESET→GRAY→·agent contiguously, proving the order.
+assert_contains "pr-position-before-agent" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
+  $'\033[92m🔀#9✓\033[0m\033[90m·sec'
+
+# === PR badge OSC 8 clickable link (pr.url) ===
+
+# OSC 8 link present when pr.url is set
+assert_contains "pr-osc8-link" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/o/r/pull/1234"}}' \
+  "]8;;https://github.com/o/r/pull/1234"
+
+# Still shows the visible badge text alongside the link
+assert_contains "pr-osc8-text-still-shown" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/o/r/pull/1234"}}' \
+  "🔀#1234✓"
+
+# Colour must survive next to the link: the OSC 8 open + ST must be immediately
+# followed by the real GREEN escape (ESC[92m), NOT a literal "033[92m". This
+# catches the echo -e backslash-merge where the ST eats the colour escape lead.
+assert_contains "pr-osc8-colour-intact" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/o/r/pull/1234"}}' \
+  $'\033]8;;https://github.com/o/r/pull/1234\033\\\033[92m'
+
+# Close ST must not swallow the following agent colour either (agent abuts badge
+# with no leading space): link-close ST then GRAY then ·agent, contiguous.
+assert_contains "pr-osc8-close-keeps-agent-colour" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/o/r/pull/1234"},"agent":{"name":"sec"}}' \
+  $'\033]8;;\033\\\033[90m·sec'
+
+# No url -> no OSC 8 sequence, but badge still renders
+assert_not_contains "pr-no-url-no-osc8" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
+  "]8;;"
+
+assert_contains "pr-no-url-badge-shown" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
+  "🔀#1234✓"
+
+# === PR badge OSC 8 width measurement ===
+# The hidden URL inside the OSC 8 link must NOT count toward row width. A ~150-char
+# URL would blow past COLUMNS=80 if counted, forcing a 2-row wrap. With correct
+# stripping, visible row1 (⚔ Opus 🔀#1234✓) + row2 (ctx bar) fits on one line.
+PR_LONGURL='{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/an-extremely-long-organisation-name-here/an-extremely-long-repository-name-goes-right-here/pull/1234567890123456"}}'
+
+assert_single_line "pr-osc8-width-stripped" "80" "rpg" "$PR_LONGURL"
+assert_single_line "pr-osc8-width-stripped-bloom" "80" "bloom" "$PR_LONGURL"
+
+# === Version consistency ===
+# VERSION file and STATUSLINE_HP_VERSION in the script must stay in sync. Checks
+# the invariant (they are equal and look like x.y.z) WITHOUT hardcoding a version,
+# so the suite stays green across future bumps and only fails on real drift.
+VERSION_FILE="$(cat "$SCRIPT_DIR/VERSION")"
+SCRIPT_VERSION="$(grep -E '^STATUSLINE_HP_VERSION=' "$STATUSLINE" | sed -E 's/.*"([^"]+)".*/\1/')"
+if [ "$VERSION_FILE" = "$SCRIPT_VERSION" ] && echo "$VERSION_FILE" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  PASS=$((PASS + 1)); echo "PASS: version-consistency"
+else
+  FAIL=$((FAIL + 1)); FAILED_NAMES+=("version-consistency")
+  echo "FAIL: version-consistency (VERSION=$VERSION_FILE SCRIPT=$SCRIPT_VERSION)"
+fi
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
