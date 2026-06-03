@@ -503,6 +503,12 @@ assert_contains "pr-pending-colour-yellow" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"pending"}}' \
   $'\033[93m'
 
+# draft -> GRAY. Bare \033[90m is NOT conclusive (GRAY appears twice in this
+# output), so pin the full GRAY+icon+number+glyph run to identify the badge.
+assert_contains "pr-draft-colour-gray" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"draft"}}' \
+  $'\033[90m🔀#7✎'
+
 # Review state absent -> number shows, neutral, NO glyph
 assert_contains "pr-no-review-number" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
@@ -515,6 +521,16 @@ assert_not_contains "pr-no-review-no-checkglyph" "rpg" \
 assert_not_contains "pr-no-review-no-xglyph" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
   "✗"
+
+# Absent review_state must show NONE of the four state glyphs, not just the
+# check/x pair: guard the pending (…) and draft (✎) glyphs too.
+assert_not_contains "pr-no-review-no-ellipsis-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "…"
+
+assert_not_contains "pr-no-review-no-draft-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234}}' \
+  "✎"
 
 # Unknown review state -> safe degrade (no glyph), still shows number
 assert_contains "pr-unknown-review-number" "rpg" \
@@ -545,6 +561,12 @@ assert_not_contains "pr-no-number-no-badge" "rpg" \
 assert_contains "pr-position-order" "rpg" \
   '{"model":{"display_name":"Opus"},"worktree":{"name":"wt"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
   $'wt\033[0m \033[92m🔀#9✓'
+
+# Other half of the contract: badge sits BEFORE ·agent even with no worktree.
+# Pattern spans badge→RESET→GRAY→·agent contiguously, proving the order.
+assert_contains "pr-position-before-agent" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":9,"review_state":"approved"},"agent":{"name":"sec"}}' \
+  $'\033[92m🔀#9✓\033[0m\033[90m·sec'
 
 # --- Summary ---
 echo ""
