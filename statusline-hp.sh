@@ -519,6 +519,9 @@ import sys, re, unicodedata
 # Strip OSC 8 hyperlinks first: ESC ]8;; URL ST and ESC ]8;; ST (close). The ST
 # carries 1 or 2 trailing backslashes in this pre-echo form, so allow both. The
 # bracket is ]8;; (right bracket) so this never touches SGR [..m (left bracket).
+# The non-greedy .*? relies on sh() stripping backslashes from PR_URL, so no
+# \033 can appear inside the URL and each match stops at the open ST, not the
+# close one. If sh() ever stops stripping backslashes, revisit this.
 OSC8_RE = re.compile(r"(?:\x1b|\\033)\]8;;.*?(?:\x1b|\\033)\\{1,2}")
 ANSI_RE = re.compile(r"(?:\x1b|\\033)\[[0-9;]*m")
 def dw(s):

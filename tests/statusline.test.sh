@@ -487,27 +487,34 @@ assert_contains "pr-draft-glyph" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"draft"}}' \
   "🔀#7✎"
 
-# Colour is conclusive for non-grey states in minimal JSON (no bars, ctx bar is cyan):
+# Colour assertions pin the full colour+icon+number+glyph run rather than the
+# bare escape code, so they identify the badge unambiguously and stay conclusive
+# even if rate-limit fields (which reuse the same bright colours) are later added
+# to a test JSON.
 # changes_requested -> BRIGHT_RED
 assert_contains "pr-changes-colour-red" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"changes_requested"}}' \
-  $'\033[91m'
+  $'\033[91m🔀#7✗'
 
 # approved -> BRIGHT_GREEN
 assert_contains "pr-approved-colour-green" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"approved"}}' \
-  $'\033[92m'
+  $'\033[92m🔀#7✓'
 
 # pending -> BRIGHT_YELLOW
 assert_contains "pr-pending-colour-yellow" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"pending"}}' \
-  $'\033[93m'
+  $'\033[93m🔀#7…'
 
-# draft -> GRAY. Bare \033[90m is NOT conclusive (GRAY appears twice in this
-# output), so pin the full GRAY+icon+number+glyph run to identify the badge.
+# draft -> GRAY (bare \033[90m is not conclusive: GRAY appears more than once)
 assert_contains "pr-draft-colour-gray" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"draft"}}' \
   $'\033[90m🔀#7✎'
+
+# Bloom theme shares the same colour codes; pin one to guard the bloom render path.
+assert_contains "pr-approved-colour-green-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":7,"review_state":"approved"}}' \
+  $'\033[92m🌷#7✓'
 
 # Review state absent -> number shows, neutral, NO glyph
 assert_contains "pr-no-review-number" "rpg" \
@@ -540,6 +547,19 @@ assert_contains "pr-unknown-review-number" "rpg" \
 assert_not_contains "pr-unknown-review-no-glyph" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
   "✓"
+
+# An unrecognised state must not leak ANY of the other three glyphs either.
+assert_not_contains "pr-unknown-review-no-xglyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "✗"
+
+assert_not_contains "pr-unknown-review-no-ellipsis-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "…"
+
+assert_not_contains "pr-unknown-review-no-draft-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"weird"}}' \
+  "✎"
 
 # No pr -> no badge (baseline regression)
 assert_not_contains "pr-absent-rpg" "rpg" \
@@ -612,14 +632,16 @@ assert_single_line "pr-osc8-width-stripped" "80" "rpg" "$PR_LONGURL"
 assert_single_line "pr-osc8-width-stripped-bloom" "80" "bloom" "$PR_LONGURL"
 
 # === Version consistency ===
-# VERSION file must equal STATUSLINE_HP_VERSION in the script
+# VERSION file and STATUSLINE_HP_VERSION in the script must stay in sync. Checks
+# the invariant (they are equal and look like x.y.z) WITHOUT hardcoding a version,
+# so the suite stays green across future bumps and only fails on real drift.
 VERSION_FILE="$(cat "$SCRIPT_DIR/VERSION")"
 SCRIPT_VERSION="$(grep -E '^STATUSLINE_HP_VERSION=' "$STATUSLINE" | sed -E 's/.*"([^"]+)".*/\1/')"
-if [ "$VERSION_FILE" = "0.5.0" ] && [ "$SCRIPT_VERSION" = "0.5.0" ]; then
-  PASS=$((PASS + 1)); echo "PASS: version-consistency-0.5.0"
+if [ "$VERSION_FILE" = "$SCRIPT_VERSION" ] && echo "$VERSION_FILE" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  PASS=$((PASS + 1)); echo "PASS: version-consistency"
 else
-  FAIL=$((FAIL + 1)); FAILED_NAMES+=("version-consistency-0.5.0")
-  echo "FAIL: version-consistency-0.5.0 (VERSION=$VERSION_FILE SCRIPT=$SCRIPT_VERSION)"
+  FAIL=$((FAIL + 1)); FAILED_NAMES+=("version-consistency")
+  echo "FAIL: version-consistency (VERSION=$VERSION_FILE SCRIPT=$SCRIPT_VERSION)"
 fi
 
 # --- Summary ---

@@ -10,7 +10,7 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 - Badge is a clickable OSC 8 hyperlink to `pr.url` (degrades to plain text on terminals without OSC 8 support); the string-terminator escaping is colour-safe so the badge colour survives next to the link
 - Width measurement now strips OSC 8 sequences so the hidden URL does not skew the responsive single-line / 2-row wrap decision
 - README: documented the PR badge plus `hideVimModeIndicator` and `refreshInterval` settings tips
-- +30 new tests covering the four review states, absent/unknown state, position ordering, no-url fallback, OSC 8 colour-safety, OSC 8 width equivalence, and version consistency (73 → 103)
+- +34 new tests covering the four review states, absent/unknown state (all glyphs guarded), position ordering, no-url fallback, OSC 8 colour-safety, OSC 8 width equivalence, theme colour rendering, and version consistency (73 → 107)
 
 ## [0.4.0] — 2026-05-20
 
