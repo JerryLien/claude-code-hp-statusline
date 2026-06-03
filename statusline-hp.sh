@@ -516,8 +516,13 @@ else
     widths=$(printf '%s\n%s' "$parts_row1" "$parts_row2" | python3 -c '
 import sys, re, unicodedata
 # Match both actual ESC byte (\x1b) and literal backslash-0-3-3 (\033)
+# Strip OSC 8 hyperlinks first: ESC ]8;; URL ST and ESC ]8;; ST (close). The ST
+# carries 1 or 2 trailing backslashes in this pre-echo form, so allow both. The
+# bracket is ]8;; (right bracket) so this never touches SGR [..m (left bracket).
+OSC8_RE = re.compile(r"(?:\x1b|\\033)\]8;;.*?(?:\x1b|\\033)\\{1,2}")
 ANSI_RE = re.compile(r"(?:\x1b|\\033)\[[0-9;]*m")
 def dw(s):
+    s = OSC8_RE.sub("", s)
     s = ANSI_RE.sub("", s)
     w = 0
     for ch in s:

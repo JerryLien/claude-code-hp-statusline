@@ -602,6 +602,15 @@ assert_contains "pr-no-url-badge-shown" "rpg" \
   '{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved"}}' \
   "🔀#1234✓"
 
+# === PR badge OSC 8 width measurement ===
+# The hidden URL inside the OSC 8 link must NOT count toward row width. A ~150-char
+# URL would blow past COLUMNS=80 if counted, forcing a 2-row wrap. With correct
+# stripping, visible row1 (⚔ Opus 🔀#1234✓) + row2 (ctx bar) fits on one line.
+PR_LONGURL='{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":"approved","url":"https://github.com/an-extremely-long-organisation-name-here/an-extremely-long-repository-name-goes-right-here/pull/1234567890123456"}}'
+
+assert_single_line "pr-osc8-width-stripped" "80" "rpg" "$PR_LONGURL"
+assert_single_line "pr-osc8-width-stripped-bloom" "80" "bloom" "$PR_LONGURL"
+
 # --- Summary ---
 echo ""
 echo "Passed: $PASS"
