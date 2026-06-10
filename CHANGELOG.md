@@ -3,6 +3,11 @@
 All notable changes to `statusline-hp.sh`. Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 Versions are tagged in the `VERSION` file and embedded in the script as `STATUSLINE_HP_VERSION`.
 
+## [Unreleased]
+
+- +6 Fable 5 regression tests (rpg + bloom) asserting the script stays model-agnostic for the new top-tier model: `model.display_name` pass-through, `[1M]` badge driven by `context_window_size` (not a model allow-list), and effort shown because `Fable 5` doesn't match the `*Haiku*` effort-hide guard (107 → 113)
+- Test-only — no change to `statusline-hp.sh`, so `VERSION` is intentionally not bumped (a bump would misfire the `📦 sl→X.Y.Z` self-update badge for a byte-identical script)
+
 ## [0.5.0] — 2026-06-03
 
 - `🔀#1234✓` (rpg) / `🌷#1234✓` (bloom) PR badge in row1 when an open PR exists for the current branch (`pr.number` / `pr.review_state`)
