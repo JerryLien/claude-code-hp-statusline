@@ -366,6 +366,39 @@ assert_not_contains "c3-no-size-no-badge" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "[1M]"
 
+# C4 Fable 5 (new top-tier model) — script is model-agnostic, so a brand-new
+# model must render correctly with no code changes: name passes through, the
+# 1M-context badge keys off context_window_size (not a model allow-list), and
+# effort shows because "Fable 5" doesn't match the Haiku effort-hide guard.
+FABLE_JSON='{"model":{"display_name":"Fable 5"},"context_window":{"context_window_size":1000000},"effort":{"level":"max"}}'
+
+assert_contains "c4-fable-name" "rpg" \
+  "$FABLE_JSON" \
+  "Fable 5"
+
+assert_contains "c4-fable-1m-badge" "rpg" \
+  "$FABLE_JSON" \
+  "[1M]"
+
+assert_contains "c4-fable-effort-shows" "rpg" \
+  "$FABLE_JSON" \
+  "★max"
+
+# Bloom theme: name + [1M] badge are theme-independent; effort glyph differs
+# (RPG ★max → Bloom ⚫ max), so it's the one assertion that genuinely re-exercises
+# theme-specific rendering for the new model.
+assert_contains "c4-fable-name-bloom" "bloom" \
+  "$FABLE_JSON" \
+  "Fable 5"
+
+assert_contains "c4-fable-1m-badge-bloom" "bloom" \
+  "$FABLE_JSON" \
+  "[1M]"
+
+assert_contains "c4-fable-effort-shows-bloom" "bloom" \
+  "$FABLE_JSON" \
+  "⚫ max"
+
 # Helper: run statusline with a latest-version cache file present
 run_with_sl_latest() {
   local latest=$1 theme=$2 json=$3
