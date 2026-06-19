@@ -701,6 +701,40 @@ assert_not_contains "fast-falsy-zero-rpg" "rpg" \
   '{"model":{"display_name":"Opus"},"fast_mode":0}' \
   "⏩"
 
+# Position: fast sits immediately AFTER the effort indicator …
+assert_contains "fast-after-effort-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"high"},"fast_mode":true}' \
+  $'↑high\033[0m \033[1m\033[92m⏩fast'
+
+# … and immediately BEFORE output_style
+assert_contains "fast-before-style-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"fast_mode":true,"output_style":{"name":"explanatory"}}' \
+  $'⏩fast\033[0m \033[36m📖explanatory'
+
+# Bloom ordering (after effort): flat badge, no bright-green
+assert_contains "fast-after-effort-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"high"},"fast_mode":true}' \
+  $'🔴 high\033[0m 🐝 fast'
+
+# RPG badge carries BOLD + BRIGHT_GREEN
+assert_contains "fast-colour-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"fast_mode":true}' \
+  $'\033[1m\033[92m⏩fast'
+
+# Bloom badge is flat — must NOT inherit the RPG bright-green
+assert_not_contains "fast-bloom-flat-no-green" "bloom" \
+  '{"model":{"display_name":"Opus"},"fast_mode":true}' \
+  $'\033[92m🐝'
+
+# === fast_mode width / wrap ===
+FAST_W_OFF='{"model":{"display_name":"Opus"},"effort":{"level":"high"},"output_style":{"name":"explanatory"},"context_window":{"used_percentage":42}}'
+FAST_W_ON='{"model":{"display_name":"Opus"},"effort":{"level":"high"},"output_style":{"name":"explanatory"},"context_window":{"used_percentage":42},"fast_mode":true}'
+
+assert_single_line "fast-width-control-rpg"     "55" "rpg"   "$FAST_W_OFF"
+assert_multiline   "fast-width-badge-wraps-rpg" "55" "rpg"   "$FAST_W_ON"
+assert_single_line "fast-width-control-bloom"   "62" "bloom" "$FAST_W_OFF"
+assert_multiline   "fast-width-badge-wraps-bloom" "62" "bloom" "$FAST_W_ON"
+
 # === Version consistency ===
 # VERSION file and STATUSLINE_HP_VERSION in the script must stay in sync. Checks
 # the invariant (they are equal and look like x.y.z) WITHOUT hardcoding a version,
