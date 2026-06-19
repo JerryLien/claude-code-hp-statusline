@@ -664,6 +664,43 @@ PR_LONGURL='{"model":{"display_name":"Opus"},"pr":{"number":1234,"review_state":
 assert_single_line "pr-osc8-width-stripped" "80" "rpg" "$PR_LONGURL"
 assert_single_line "pr-osc8-width-stripped-bloom" "80" "bloom" "$PR_LONGURL"
 
+# === fast_mode indicator (fast_mode) ===
+
+# Core render per theme
+assert_contains "fast-on-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"fast_mode":true}' \
+  "⏩fast"
+
+assert_contains "fast-on-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"fast_mode":true}' \
+  "🐝 fast"
+
+# Hidden when false / absent (guard each theme glyph)
+assert_not_contains "fast-false-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"fast_mode":false}' \
+  "⏩"
+
+assert_not_contains "fast-false-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"fast_mode":false}' \
+  "🐝"
+
+assert_not_contains "fast-absent-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "⏩"
+
+assert_not_contains "fast-absent-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"}}' \
+  "🐝"
+
+# Safe degrade: non-bool truthy shows; non-bool falsy (0) hides
+assert_contains "fast-truthy-string-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"fast_mode":"yes"}' \
+  "⏩fast"
+
+assert_not_contains "fast-falsy-zero-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"fast_mode":0}' \
+  "⏩"
+
 # === Version consistency ===
 # VERSION file and STATUSLINE_HP_VERSION in the script must stay in sync. Checks
 # the invariant (they are equal and look like x.y.z) WITHOUT hardcoding a version,
