@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.5.0"
+STATUSLINE_HP_VERSION="0.6.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -120,6 +120,7 @@ else:
 api_dur = fmt_ms(g(d, "cost", "total_api_duration_ms"))
 wall_dur = fmt_ms(g(d, "cost", "total_duration_ms"))
 exceeds_200k = 1 if g(d, "exceeds_200k_tokens") else 0
+fast_mode = 1 if g(d, "fast_mode") else 0
 
 cu = g(d, "context_window", "current_usage") or {}
 cr = cu.get("cache_read_input_tokens") or 0
@@ -201,6 +202,7 @@ print(f"AGENT_NAME=\"{sh(agent_name)}\"")
 print(f"API_DURATION=\"{api_dur}\"")
 print(f"WALL_TIME=\"{wall_dur}\"")
 print(f"EXCEEDS_200K={exceeds_200k}")
+print(f"FAST_MODE={fast_mode}")
 print(f"CACHE_PCT={cache_pct}")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
 print(f"IS_1M_CTX={is_1m_ctx}")
@@ -261,6 +263,8 @@ case "$THEME" in
     EFFORT_HIGH_STYLE=""
     EFFORT_MED_STYLE=""
     EFFORT_LOW_STYLE=""
+    FAST_TEXT="🐝 fast"
+    FAST_STYLE=""
     CAST_ICON="🌿"
     STYLE_ICON="🌻"
     COOLDOWN_ICON="💤"
@@ -284,6 +288,8 @@ case "$THEME" in
     EFFORT_HIGH_STYLE="${BRIGHT_RED}"
     EFFORT_MED_STYLE="${BRIGHT_YELLOW}"
     EFFORT_LOW_STYLE="${GRAY}"
+    FAST_TEXT="⏩fast"
+    FAST_STYLE="${BOLD}${BRIGHT_GREEN}"
     CAST_ICON="🔮"
     STYLE_ICON="📖"
     COOLDOWN_ICON="⏳"
@@ -429,6 +435,7 @@ if [ "${PR_NUMBER:-0}" -gt 0 ] 2>/dev/null; then
 fi
 [ -n "$AGENT_NAME" ] && parts_row1+="${GRAY}·${AGENT_NAME}${RESET}"
 [ -n "$EFFORT_ICON" ] && parts_row1+=" ${EFFORT_ICON}"
+[ "${FAST_MODE:-0}" = "1" ] && parts_row1+=" ${FAST_STYLE}${FAST_TEXT}${RESET}"
 if [ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ]; then
   parts_row1+=" ${CYAN}${STYLE_ICON}${OUTPUT_STYLE}${RESET}"
 fi
