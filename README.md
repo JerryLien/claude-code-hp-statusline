@@ -27,6 +27,7 @@ The default status line tells you very little. This one turns everything that ma
 - 📁 **Workspace + worktree** — Current dir basename and `--worktree` name always visible
 - 🔀 **PR badge** — Open PR for the current branch with review-state glyph + colour, click-to-open via OSC 8 link
 - 💭 / **[1M]** **Model state indicators** — Shows when extended thinking is on or when running with a 1M-token context window
+- ⏩ / 🐝 **Fast mode** — Badge appears next to the effort level when Opus fast mode (`/fast`) is on
 - 🎨 **Two themes** — classic RPG (`⚔❤█░`) or peaceful Bloom garden (`🌱🌸🍄🌕`)
 - 📏 **Responsive layout** — auto-wraps into 2 rows (identity / metrics) when the terminal is too narrow, stays single-line on wide screens
 
@@ -67,6 +68,7 @@ Only appear when the relevant data is present:
 
 - **⌨N / ⌨I** — Current vim mode (NORMAL / INSERT), when vim mode is enabled
 - **·agent** — Agent name when launched via `--agent`
+- **⏩fast / 🐝 fast — Fast mode** — Appears right after the effort level when Opus fast mode is enabled (`/fast`, the `fast_mode` field). RPG renders `⏩fast` in bold bright-green; Bloom renders `🐝 fast` flat. Hidden when fast mode is off — and naturally absent on models that don't report it (Claude Code only sends it truthy for Opus)
 - **🔀#1234✓ / 🌷#1234✓ PR badge** — Open PR for the current branch (`pr.number`), placed right after the worktree block. Glyph + colour encode `pr.review_state`: `✓` approved (green), `…` pending (yellow), `✗` changes_requested (red), `✎` draft (grey); neutral cyan with no glyph when the review state is absent or unrecognised. When `pr.url` is set the badge is a clickable OSC 8 hyperlink (and the hidden URL is excluded from the responsive width calculation)
 
 ## Requirements

@@ -5,8 +5,14 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
-- +6 Fable 5 regression tests (rpg + bloom) asserting the script stays model-agnostic for the new top-tier model: `model.display_name` pass-through, `[1M]` badge driven by `context_window_size` (not a model allow-list), and effort shown because `Fable 5` doesn't match the `*Haiku*` effort-hide guard (107 → 113)
-- Test-only — no change to `statusline-hp.sh`, so `VERSION` is intentionally not bumped (a bump would misfire the `📦 sl→X.Y.Z` self-update badge for a byte-identical script)
+## [0.6.0] — 2026-06-19
+
+- `⏩fast` (rpg, bold bright-green) / `🐝 fast` (bloom, flat) badge in row1 when Opus fast mode (`/fast`) is on, parsed from the top-level `fast_mode` boolean
+- Placed immediately after the effort indicator and before `output_style`, forming a "how the model runs" group (effort + output speed); shown only when `fast_mode` is truthy (no model guard needed — Claude Code only reports it truthy for Opus)
+- Neutral styling by design: fast mode is a deliberate user choice, so the badge does not imply a cost warning
+- Width: `⏩` (U+23E9) and `🐝` (U+1F41D) both measure 2 cells via `east_asian_width=W`, so the responsive wrap calculation is correct with no change to `dw()`
+- +12 tests covering render (both themes), hidden-when-off, non-bool safe-degrade, position (after effort / before output_style), colour (rpg bold+green, bloom flat), and width/wrap differential (113 → 130)
+- +6 Fable 5 regression tests (rpg + bloom) asserting the script stays model-agnostic: `model.display_name` pass-through, `[1M]` badge driven by `context_window_size` (not a model allow-list), and effort shown because `Fable 5` doesn't match the `*Haiku*` effort-hide guard
 
 ## [0.5.0] — 2026-06-03
 
