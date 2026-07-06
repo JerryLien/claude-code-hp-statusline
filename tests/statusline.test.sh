@@ -230,29 +230,31 @@ assert_contains "b1-7d-normal-rotate" "rpg" \
   '{"model":{"display_name":"Opus"},"rate_limits":{"seven_day":{"used_percentage":50.0,"resets_at":9999999999}}}' \
   "↻"
 
-# B2 effort gradient
-assert_contains_effort "b2-rpg-max-reverse" "max" "rpg" \
-  '{"model":{"display_name":"Opus"}}' \
+# B2 effort gradient — effort comes from the payload's effort.level (the only
+# source since 0.6.2; the settings.json fallback displayed the baseline default
+# for models that don't run effort at all)
+assert_contains "b2-rpg-max-reverse" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"max"}}' \
   $'\033[7m'
 
-assert_contains_effort "b2-rpg-xhigh-bold" "xhigh" "rpg" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_contains "b2-rpg-xhigh-bold" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"xhigh"}}' \
   $'\033[1m'
 
-assert_not_contains_effort "b2-rpg-xhigh-no-reverse" "xhigh" "rpg" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_not_contains "b2-rpg-xhigh-no-reverse" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"xhigh"}}' \
   $'\033[7m'
 
-assert_not_contains_effort "b2-rpg-high-no-reverse" "high" "rpg" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_not_contains "b2-rpg-high-no-reverse" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"high"}}' \
   $'\033[7m'
 
-assert_contains_effort "b2-bloom-max-reverse" "max" "bloom" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_contains "b2-bloom-max-reverse" "bloom" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"max"}}' \
   $'\033[7m'
 
-assert_not_contains_effort "b2-bloom-xhigh-no-reverse" "xhigh" "bloom" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_not_contains "b2-bloom-xhigh-no-reverse" "bloom" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"xhigh"}}' \
   $'\033[7m'
 
 # Integration: all features together
@@ -300,24 +302,24 @@ assert_not_contains "workspace-dir-no-field" "rpg" \
   "📁"
 
 # Effort label spelled out (RPG)
-assert_contains_effort "effort-word-max-rpg" "max" "rpg" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_contains "effort-word-max-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"max"}}' \
   "★max"
 
-assert_contains_effort "effort-word-high-rpg" "high" "rpg" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_contains "effort-word-high-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"high"}}' \
   "↑high"
 
 # Effort label spelled out (Bloom)
-assert_contains_effort "effort-word-max-bloom" "max" "bloom" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_contains "effort-word-max-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"max"}}' \
   "⚫ max"
 
-assert_contains_effort "effort-word-high-bloom" "high" "bloom" \
-  '{"model":{"display_name":"Opus"}}' \
+assert_contains "effort-word-high-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"effort":{"level":"high"}}' \
   "🔴 high"
 
-# C1 effort.level (spec field) — runtime overrides settings.json
+# C1 effort.level (spec field) — payload wins even with a settings effortLevel present
 assert_contains_effort "c1-runtime-overrides-settings-rpg" "low" "rpg" \
   '{"model":{"display_name":"Opus"},"effort":{"level":"max"}}' \
   "★max"
@@ -331,10 +333,32 @@ assert_contains "c1-effort-uppercase" "rpg" \
   '{"model":{"display_name":"Opus"},"effort":{"level":"HIGH"}}' \
   "↑high"
 
-# C1 settings fallback when effort.level absent
-assert_contains_effort "c1-settings-fallback" "high" "rpg" \
+# C6 effort.level absence means the model is not running effort (Claude Code
+# only emits the field for effort-capable models). settings.json effortLevel is
+# the *default for new sessions*, not live session state — it must never be
+# displayed. Regression: Sonnet 4.5 (on Claude Code's effort denylist) used to
+# show the settings baseline ⇈xhigh via the fallback.
+assert_not_contains_effort "c6-no-effort-no-badge-sonnet45" "xhigh" "rpg" \
+  '{"model":{"display_name":"Sonnet 4.5"}}' \
+  "xhigh"
+
+assert_not_contains_effort "c6-no-effort-no-badge-opus" "high" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "↑high"
+
+assert_not_contains_effort "c6-no-effort-no-badge-bloom" "max" "bloom" \
+  '{"model":{"display_name":"Sonnet 4.5"}}' \
+  "⚫ max"
+
+# C6 pure data-driven: no model-name mask. If Claude Code ever emits
+# effort.level for a Haiku-family model, trust the payload and render it.
+assert_contains "c6-haiku-with-effort-renders" "rpg" \
+  '{"model":{"display_name":"Haiku 4.5"},"effort":{"level":"high"}}' \
+  "↑high"
+
+assert_not_contains_effort "c6-haiku-without-effort-hidden" "xhigh" "rpg" \
+  '{"model":{"display_name":"Haiku 4.5"}}' \
+  "xhigh"
 
 # C2 thinking.enabled
 assert_contains "c2-thinking-on-rpg" "rpg" \
