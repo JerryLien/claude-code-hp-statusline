@@ -399,6 +399,33 @@ assert_contains "c4-fable-effort-shows-bloom" "bloom" \
   "$FABLE_JSON" \
   "⚫ max"
 
+# C5 exceeds_200k_tokens: same flag, two meanings. In a 200k window it is a
+# capacity alarm (red ⚠200k); in a 1M window it marks the >200k long-context
+# pricing tier (yellow 💰200k+), so the red alarm must NOT appear there.
+assert_contains "c5-200k-warn-small-window" "rpg" \
+  '{"model":{"display_name":"Opus"},"exceeds_200k_tokens":true,"context_window":{"context_window_size":200000}}' \
+  "⚠200k"
+
+assert_contains "c5-200k-warn-no-size" "rpg" \
+  '{"model":{"display_name":"Opus"},"exceeds_200k_tokens":true}' \
+  "⚠200k"
+
+assert_contains "c5-200k-pricing-1m" "rpg" \
+  '{"model":{"display_name":"Fable 5"},"exceeds_200k_tokens":true,"context_window":{"context_window_size":1000000}}' \
+  "💰200k+"
+
+assert_not_contains "c5-200k-no-red-warn-1m" "rpg" \
+  '{"model":{"display_name":"Fable 5"},"exceeds_200k_tokens":true,"context_window":{"context_window_size":1000000}}' \
+  "⚠200k"
+
+assert_contains "c5-200k-pricing-1m-bloom" "bloom" \
+  '{"model":{"display_name":"Fable 5"},"exceeds_200k_tokens":true,"context_window":{"context_window_size":1000000}}' \
+  "💰200k+"
+
+assert_not_contains "c5-200k-no-hint-under-200k-1m" "rpg" \
+  '{"model":{"display_name":"Fable 5"},"exceeds_200k_tokens":false,"context_window":{"context_window_size":1000000}}' \
+  "200k"
+
 # Helper: run statusline with a latest-version cache file present
 run_with_sl_latest() {
   local latest=$1 theme=$2 json=$3
