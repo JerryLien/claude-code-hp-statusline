@@ -5,6 +5,12 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-07-06
+
+- `⚠200k` no longer stays permanently red in 1M-context sessions: `exceeds_200k_tokens` is a fixed 200k flag regardless of window size (verified against the Claude Code v2.1.201 payload builder), so in a 1M window it now renders as a yellow `💰200k+` pricing-tier hint (>200k input = 2x token rate) instead of a capacity alarm; the red `⚠200k` is unchanged for 200k windows (and when `context_window_size` is absent)
+- Compat audit vs Claude Code v2.1.201: all 34 consumed JSON paths still emitted, `COLUMNS`-first width detection matches the 2.1.153+ contract, and `pr.*` (`pr.number`/`pr.url`/`pr.review_state`) is now officially documented — the 0.5.0 badge's field assumption is confirmed end-to-end; `fast_mode` is emitted unconditionally but remains undocumented
+- +6 tests: red alarm in 200k/absent-size windows, yellow hint in 1M (both themes), no red alarm in 1M, no hint below the threshold (130 → 136)
+
 ## [0.6.0] — 2026-06-19
 
 - `⏩fast` (rpg, bold bright-green) / `🐝 fast` (bloom, flat) badge in row1 when Opus fast mode (`/fast`) is on, parsed from the top-level `fast_mode` boolean

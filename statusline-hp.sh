@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.6.0"
+STATUSLINE_HP_VERSION="0.6.1"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -467,9 +467,15 @@ if [ "${CACHE_PCT:-"-1"}" -ge 0 ] 2>/dev/null; then
   parts_row2+=" ${cache_color}⚡${CACHE_PCT}%${RESET}"
 fi
 
-# 200k threshold warning
+# 200k threshold: exceeds_200k_tokens is a fixed 200k flag regardless of
+# window size, so in a 1M window it means the >200k pricing tier (2x rate),
+# not "almost full" — show a yellow cost hint there instead of a red alarm.
 if [ "${EXCEEDS_200K:-0}" = "1" ]; then
-  parts_row2+=" ${BRIGHT_RED}⚠200k${RESET}"
+  if [ "${IS_1M_CTX:-0}" = "1" ]; then
+    parts_row2+=" ${BRIGHT_YELLOW}💰200k+${RESET}"
+  else
+    parts_row2+=" ${BRIGHT_RED}⚠200k${RESET}"
+  fi
 fi
 
 # API casting time
