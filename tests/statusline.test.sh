@@ -360,6 +360,37 @@ assert_not_contains_effort "c6-haiku-without-effort-hidden" "xhigh" "rpg" \
   '{"model":{"display_name":"Haiku 4.5"}}' \
   "xhigh"
 
+# C7 pr.kind — "cr" (remote code-review session, undocumented field verified
+# emitted by 2.1.201) swaps the PR icon to 🔍 in both themes
+assert_contains "c7-pr-kind-cr-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":42,"kind":"cr"}}' \
+  "🔍#42"
+
+assert_contains "c7-pr-kind-cr-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":42,"kind":"cr"}}' \
+  "🔍#42"
+
+assert_contains "c7-pr-kind-absent-keeps-theme-icon" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":42}}' \
+  "🔀#42"
+
+assert_contains "c7-pr-kind-other-keeps-theme-icon" "bloom" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":42,"kind":"pr"}}' \
+  "🌷#42"
+
+# C7 workspace.repo — owner+name upgrade the dir badge to owner/name
+assert_contains "c7-repo-badge" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/checkout","repo":{"host":"github.com","owner":"jerry","name":"my-project"}}}' \
+  "📁 jerry/my-project"
+
+assert_not_contains "c7-repo-badge-replaces-basename" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/checkout","repo":{"owner":"jerry","name":"my-project"}}}' \
+  "checkout"
+
+assert_contains "c7-repo-partial-falls-back" "rpg" \
+  '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/checkout","repo":{"owner":"jerry"}}}' \
+  "📁 checkout"
+
 # C2 thinking.enabled
 assert_contains "c2-thinking-on-rpg" "rpg" \
   '{"model":{"display_name":"Opus"},"thinking":{"enabled":true}}' \
@@ -449,6 +480,146 @@ assert_contains "c5-200k-pricing-1m-bloom" "bloom" \
 assert_not_contains "c5-200k-no-hint-under-200k-1m" "rpg" \
   '{"model":{"display_name":"Fable 5"},"exceeds_200k_tokens":false,"context_window":{"context_window_size":1000000}}' \
   "200k"
+
+# C8 update-command downgrade guard — extract the bash snippet from
+# commands/statusline-update.md and run it with a mocked curl + isolated HOME.
+# run_update_snippet <remote VERSION> <version inside remote script> <installed version>
+# Sets: UPD_STATUS (exit code), UPD_OUT (output), UPD_INSTALLED (version now on disk)
+run_update_snippet() {
+  local remote=$1 remote_script=$2 installed=$3
+  local tmp
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/slupdate.XXXXXX") || return 1
+  mkdir -p "$tmp/bin" "$tmp/home/.claude"
+  cat > "$tmp/bin/curl" <<'FAKE'
+#!/bin/bash
+out=""; url=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    -*) shift ;;
+    *)  url="$1"; shift ;;
+  esac
+done
+case "$url" in
+  */VERSION)          content="$FAKE_REMOTE_VERSION" ;;
+  */statusline-hp.sh) content="$FAKE_REMOTE_SCRIPT" ;;
+  *) exit 22 ;;
+esac
+if [ -n "$out" ]; then printf '%s\n' "$content" > "$out"; else printf '%s\n' "$content"; fi
+FAKE
+  chmod +x "$tmp/bin/curl"
+  printf '#!/bin/bash\nSTATUSLINE_HP_VERSION="%s"\n' "$installed" > "$tmp/home/.claude/statusline-hp.sh"
+  sed -n '/^```bash$/,/^```$/p' "$SCRIPT_DIR/commands/statusline-update.md" | sed '1d;$d' > "$tmp/snippet.sh"
+  local script_body
+  printf -v script_body '#!/bin/bash\nSTATUSLINE_HP_VERSION="%s"\necho ok\n' "$remote_script"
+  UPD_OUT=$(HOME="$tmp/home" PATH="$tmp/bin:$PATH" \
+    FAKE_REMOTE_VERSION="$remote" FAKE_REMOTE_SCRIPT="$script_body" \
+    bash "$tmp/snippet.sh" 2>&1)
+  UPD_STATUS=$?
+  UPD_INSTALLED=$(grep -m1 -oE '[0-9.]+' "$tmp/home/.claude/statusline-hp.sh" || echo "?")
+  rm -rf "$tmp"
+}
+
+assert_update() {
+  local name=$1 remote=$2 remote_script=$3 installed=$4 want_status=$5 want_installed=$6
+  run_update_snippet "$remote" "$remote_script" "$installed"
+  if [ "$UPD_STATUS" = "$want_status" ] && [ "$UPD_INSTALLED" = "$want_installed" ]; then
+    PASS=$((PASS + 1)); echo "PASS: $name"
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$name")
+    echo "FAIL: $name"
+    echo "  want status=$want_status installed=$want_installed"
+    echo "  got  status=$UPD_STATUS installed=$UPD_INSTALLED"
+    echo "  output: $UPD_OUT"
+  fi
+}
+
+#              name                          remote  in-script  installed  status  installed-after
+assert_update "c8-upgrade-installs"          "0.7.0" "0.7.0"    "0.6.0"    0       "0.7.0"
+assert_update "c8-downgrade-aborts"          "0.5.0" "0.5.0"    "0.6.0"    1       "0.6.0"
+assert_update "c8-same-version-noop"         "0.6.0" "0.6.0"    "0.6.0"    0       "0.6.0"
+assert_update "c8-script-version-mismatch"   "0.7.0" "0.6.9"    "0.6.0"    1       "0.6.0"
+
+# C9 subagentStatusLine mode — tasks[] payload emits {"id","content"} JSON lines
+# Helper: every non-empty output line must parse as JSON with id + content
+assert_subagent_json() {
+  local name=$1 theme=$2 json=$3
+  local output
+  output=$(printf '%s\n' "$json" | STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1)
+  if printf '%s\n' "$output" | python3 -c '
+import json, sys
+ok = True
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        o = json.loads(line)
+        if not (isinstance(o.get("id"), str) and isinstance(o.get("content"), str)):
+            ok = False
+    except Exception:
+        ok = False
+sys.exit(0 if ok else 1)
+'; then
+    PASS=$((PASS + 1)); echo "PASS: $name"
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$name")
+    echo "FAIL: $name"; echo "  Output:  $output"
+  fi
+}
+
+SUB_START=$(( ( $(date +%s) - 3723 ) * 1000 ))  # 1h02m ago (minute-stable vs race)
+SUB_JSON='{"session_id":"s","cwd":"/tmp","columns":80,"tasks":[{"id":"t1","name":"explore-agent","type":"local_agent","status":"running","description":"d","label":"l","startTime":'$SUB_START',"tokenCount":38200,"tokenSamples":[100,200,400,800]},{"id":"t2","status":"completed","label":"verify:bugs","tokenCount":45100,"tokenSamples":[45100]}]}'
+
+assert_subagent_json "c9-json-lines-valid-rpg" "rpg" "$SUB_JSON"
+assert_subagent_json "c9-json-lines-valid-bloom" "bloom" "$SUB_JSON"
+
+assert_contains "c9-running-glyph-rpg" "rpg" "$SUB_JSON" "⚔ "
+assert_contains "c9-completed-glyph-rpg" "rpg" "$SUB_JSON" "💀"
+assert_contains "c9-running-glyph-bloom" "bloom" "$SUB_JSON" "🌱"
+assert_contains "c9-completed-glyph-bloom" "bloom" "$SUB_JSON" "🌸"
+
+assert_contains "c9-token-compact" "rpg" "$SUB_JSON" "38.2k"
+assert_contains "c9-elapsed-hours" "rpg" "$SUB_JSON" "♔1h02m"
+
+# sparkline: deltas 100,200,400 normalize to ▃▅█ (rpg) / 🌿🌸🌼 (bloom)
+assert_contains "c9-spark-rpg" "rpg" "$SUB_JSON" "▃▅█"
+assert_contains "c9-spark-bloom" "bloom" "$SUB_JSON" "🌿🌸🌼"
+
+# name fallback chain: no name → label; no name/label → description; → type
+assert_contains "c9-name-fallback-label" "rpg" "$SUB_JSON" "verify:bugs"
+assert_contains "c9-name-fallback-description" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","description":"only-desc","tokenCount":5}]}' \
+  "only-desc"
+assert_contains "c9-name-fallback-type" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","type":"local_bash","tokenCount":5}]}' \
+  "local_bash"
+
+# single-sample task renders no sparkline; missing startTime renders no clock
+assert_not_contains "c9-single-sample-no-spark" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5,"tokenSamples":[5]}]}' \
+  "▁"
+assert_not_contains "c9-no-starttime-no-clock" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5}]}' \
+  "♔"
+
+# unknown status falls back to the running glyph
+assert_contains "c9-unknown-status-runs" "rpg" \
+  '{"tasks":[{"id":"a","status":"someday-new","label":"x","tokenCount":5}]}' \
+  "⚔ "
+
+# empty tasks list is still subagent mode: no main-statusline leakage
+assert_not_contains "c9-empty-tasks-no-main-render" "rpg" \
+  '{"tasks":[]}' \
+  "🧠"
+
+# main mode must not be hijacked: "tasks" as a non-list value falls through
+assert_contains "c9-tasks-not-list-main-mode" "rpg" \
+  '{"model":{"display_name":"Opus"},"tasks":"nope"}' \
+  "⚔ Opus"
+assert_contains "c9-tasks-substring-main-mode" "rpg" \
+  '{"model":{"display_name":"Opus"},"session_name":"my-tasks-list"}' \
+  "#my-tasks-list"
 
 # Helper: run statusline with a latest-version cache file present
 run_with_sl_latest() {

@@ -69,7 +69,39 @@ Only appear when the relevant data is present:
 - **⌨N / ⌨I** — Current vim mode (NORMAL / INSERT), when vim mode is enabled
 - **·agent** — Agent name when launched via `--agent`
 - **⏩fast / 🐝 fast — Fast mode** — Appears right after the effort level when Opus fast mode is enabled (`/fast`, the `fast_mode` field). RPG renders `⏩fast` in bold bright-green; Bloom renders `🐝 fast` flat. Hidden when fast mode is off — and naturally absent on models that don't report it (Claude Code only sends it truthy for Opus)
-- **🔀#1234✓ / 🌷#1234✓ PR badge** — Open PR for the current branch (`pr.number`), placed right after the worktree block. Glyph + colour encode `pr.review_state`: `✓` approved (green), `…` pending (yellow), `✗` changes_requested (red), `✎` draft (grey); neutral cyan with no glyph when the review state is absent or unrecognised. When `pr.url` is set the badge is a clickable OSC 8 hyperlink (and the hidden URL is excluded from the responsive width calculation)
+- **🔀#1234✓ / 🌷#1234✓ PR badge** — Open PR for the current branch (`pr.number`), placed right after the worktree block. Glyph + colour encode `pr.review_state`: `✓` approved (green), `…` pending (yellow), `✗` changes_requested (red), `✎` draft (grey); neutral cyan with no glyph when the review state is absent or unrecognised. When `pr.url` is set the badge is a clickable OSC 8 hyperlink (and the hidden URL is excluded from the responsive width calculation). Remote code-review sessions (`pr.kind: "cr"`) swap the icon to `🔍` in both themes
+- **📁 owner/repo** — When Claude Code reports the repository identity (`workspace.repo.owner` + `.name`), the directory badge shows `owner/name` instead of the checkout directory basename
+
+## Subagent status line
+
+Since 0.7.0 the same script also renders the per-subagent rows in the agent
+panel. Point the `subagentStatusLine` setting at it — the script auto-detects
+the `tasks[]` payload and switches modes:
+
+```json
+{
+  "statusLine":        { "type": "command", "command": "~/.claude/statusline-hp.sh" },
+  "subagentStatusLine": { "type": "command", "command": "~/.claude/statusline-hp.sh" }
+}
+```
+
+Each running subagent gets a themed row: status glyph (RPG `⚔` running / `💀`
+completed / `☠` failed; Bloom `🌱` / `🌸` / `🥀`), agent name, a token-burn
+sparkline built from the recent `tokenSamples` history (`▂▃▅█` in RPG, flower
+stages in Bloom), the compact token total, and elapsed time. Rows the script
+cannot render fall back to Claude Code's default rendering automatically.
+
+## Field compatibility notes
+
+Two fields this script consumes are emitted by Claude Code but missing from the
+official statusline schema docs (verified by inspecting v2.1.201; they may
+change without notice in future releases):
+
+- **`fast_mode`** — drives the `⏩fast` / `🐝 fast` badge
+- **`pr.kind`** — drives the `🔍` code-review PR icon
+
+If either badge silently disappears after a Claude Code upgrade, these fields
+are the first thing to re-verify.
 
 ## Requirements
 
