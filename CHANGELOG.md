@@ -5,6 +5,15 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-06
+
+- **Subagent status line**: point the `subagentStatusLine` setting at the same script — it auto-detects the `tasks[]` payload (structural check, not just the substring probe) and emits one `{"id","content"}` JSON line per task. Rows show a themed status glyph (RPG `⚔`/`💀`/`☠`/`⏳`, Bloom `🌱`/`🌸`/`🥀`/`💤`), the agent name (fallback chain `name → label → description → type`), a token-burn sparkline from `tokenSamples` deltas (`▁▂▃▄▅▆▇█` in RPG, 4 flower stages in Bloom), the compact token total, and elapsed time (`♔1m24s` / `⏱1m24s`). Per-task render errors skip that line so Claude Code falls back to its default row. Contract verified against the v2.1.201 payload builder (5s cadence, 5s timeout, ANSI + OSC 8 supported, partial output allowed)
+- `/statusline-update` now refuses to downgrade: it compares the remote `VERSION` against the installed `STATUSLINE_HP_VERSION` (`sort -V`) and aborts when remote ≤ installed (the 2026-07-06 incident: a local repo ahead of GitHub caused the old unconditional download to downgrade 0.6.0 → 0.5.0); downloads are also validated (`bash -n` + embedded version must match the fetched `VERSION`) before touching the installed copy
+- `pr.kind: "cr"` (remote code-review session) swaps the PR badge icon to `🔍` in both themes
+- `workspace.repo.owner` + `.name` upgrade the directory badge to `📁 owner/name` (repo identity beats checkout-dir basename)
+- README: documented the subagent status line setting and a new field-compatibility section for undocumented-but-emitted fields (`fast_mode`, `pr.kind`)
+- Tests: +4 update-guard cases (mocked `curl` + isolated `HOME` running the real snippet from the command doc), +19 subagent-mode cases, +7 kind/repo badge cases (140 → 170)
+
 ## [0.6.2] — 2026-07-06
 
 - Fixed phantom effort badge on effort-less models (e.g. `⇈xhigh` shown on Sonnet 4.5): Claude Code emits `effort.level` only for effort-capable models (reverse-engineered v2.1.201 — hardcoded denylist covers `claude-3-*`, `opus-4-0/4-1`, `sonnet-4-0`, `sonnet-4-5`, `haiku-4-5`), so field absence means "not running effort". The settings.json `effortLevel` fallback displayed the *new-session default* as if it were live session state, and only ever became visible exactly when it was wrong — removed; effort is now purely payload-driven

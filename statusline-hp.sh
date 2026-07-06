@@ -8,10 +8,124 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.6.2"
+STATUSLINE_HP_VERSION="0.7.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
+
+# Subagent panel mode (point the subagentStatusLine setting at this same
+# script). Claude Code pipes a tasks[] payload; we emit one {"id","content"}
+# JSON line per task and exit. The substring probe is only a cheap gate —
+# Python confirms tasks is a real list, so a literal "tasks" string elsewhere
+# in a main payload cannot hijack main mode. Python exit 0 = subagent payload
+# handled (output may be empty; undecorated rows fall back to Claude Code
+# defaults); exit 1 = not a subagent payload, fall through to the main flow.
+if [[ "$input" == *'"tasks"'* ]]; then
+  if subagent_out=$(INPUT="$input" python3 -c '
+import json, os, sys, time
+
+try:
+    d = json.loads(os.environ.get("INPUT", "{}"))
+except:
+    sys.exit(1)
+
+tasks = d.get("tasks")
+if not isinstance(tasks, list):
+    sys.exit(1)
+
+theme = os.environ.get("STATUSLINE_THEME", "")
+if not theme:
+    try:
+        with open(os.path.expanduser("~/.claude/settings.json")) as f:
+            theme = (json.load(f).get("env") or {}).get("STATUSLINE_THEME", "")
+    except:
+        pass
+bloom = theme == "bloom"
+
+RESET = "\033[0m"; BOLD = "\033[1m"; WHITE = "\033[97m"
+CYAN = "\033[36m"; GRAY = "\033[90m"
+if bloom:
+    DONE = {"completed": "\U0001F338", "failed": "\U0001F940", "killed": "\U0001F940"}
+    RUN = "\U0001F331"; WAIT = "\U0001F4A4"; CLOCK = "⏱"
+    SPARK = ["\U0001F331", "\U0001F33F", "\U0001F338", "\U0001F33C"]; SPARK_N = 4
+else:
+    DONE = {"completed": "\U0001F480", "failed": "☠", "killed": "☠"}
+    RUN = "⚔"; WAIT = "⏳"; CLOCK = "♔"
+    SPARK = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]; SPARK_N = 8
+
+WAITING = ("queued", "waiting", "idle", "awaiting_approval", "awaiting approval")
+
+def compact(n):
+    try:
+        n = float(n)
+    except:
+        return "0"
+    if n >= 1000000:
+        return f"{n/1000000:.1f}M"
+    if n >= 1000:
+        return f"{n/1000:.1f}k"
+    return str(int(n))
+
+def spark(samples):
+    # tokenSamples = recent token totals (~5s apart); plot the growth deltas
+    if not isinstance(samples, list) or len(samples) < 2:
+        return ""
+    deltas = []
+    for a, b in zip(samples, samples[1:]):
+        try:
+            deltas.append(max(0.0, float(b) - float(a)))
+        except:
+            deltas.append(0.0)
+    deltas = deltas[-SPARK_N:]
+    hi = max(deltas)
+    if hi <= 0:
+        return SPARK[0] * len(deltas)
+    return "".join(SPARK[int(x / hi * (len(SPARK) - 1) + 0.5)] for x in deltas)
+
+def elapsed(start_ms):
+    try:
+        secs = int(time.time() - float(start_ms) / 1000.0)
+    except:
+        return ""
+    if secs < 0:
+        return ""
+    m, s = divmod(secs, 60)
+    h, m = divmod(m, 60)
+    if h > 0:
+        return f"{h}h{m:02d}m"
+    if m > 0:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
+
+for t in tasks:
+    try:
+        tid = t.get("id")
+        if not isinstance(tid, str) or not tid:
+            continue
+        status = str(t.get("status") or "").lower()
+        if status in DONE:
+            glyph = DONE[status]
+        elif status in WAITING:
+            glyph = WAIT
+        else:
+            glyph = RUN
+        name = t.get("name") or t.get("label") or t.get("description") or t.get("type") or "agent"
+        parts = [glyph, f"{BOLD}{WHITE}{str(name)}{RESET}"]
+        sp = spark(t.get("tokenSamples"))
+        if sp:
+            parts.append(sp if bloom else f"{CYAN}{sp}{RESET}")
+        parts.append(compact(t.get("tokenCount") or 0))
+        el = elapsed(t.get("startTime"))
+        if el:
+            parts.append(f"{GRAY}{CLOCK}{el}{RESET}")
+        print(json.dumps({"id": tid, "content": " ".join(parts)}, ensure_ascii=False))
+    except:
+        continue
+'); then
+    printf '%s\n' "$subagent_out"
+    exit 0
+  fi
+fi
 
 # Parse all values in one python3 call (no jq needed)
 eval "$(INPUT="$input" python3 -c '
@@ -102,6 +216,8 @@ added_count = len(added_dirs) if isinstance(added_dirs, list) else 0
 pr_number = g(d, "pr", "number")
 pr_url = g(d, "pr", "url") or ""
 pr_review = (g(d, "pr", "review_state") or "").lower()
+# pr.kind is undocumented but emitted (verified 2.1.201); "cr" = remote code review
+pr_kind = (g(d, "pr", "kind") or "").lower()
 def pos_int(v):
     try:
         n = int(v)
@@ -111,7 +227,12 @@ def pos_int(v):
 pr_num_int = pos_int(pr_number)
 cwd = g(d, "workspace", "current_dir") or g(d, "cwd") or ""
 home = os.path.expanduser("~")
-if cwd == home:
+repo_owner = g(d, "workspace", "repo", "owner") or ""
+repo_name = g(d, "workspace", "repo", "name") or ""
+if repo_owner and repo_name:
+    # Repo identity beats directory basename (checkout dir names can drift)
+    workspace_dir = f"{repo_owner}/{repo_name}"
+elif cwd == home:
     workspace_dir = "~"
 elif cwd:
     workspace_dir = os.path.basename(cwd)
@@ -213,6 +334,7 @@ print(f"ADDED_COUNT={added_count}")
 print(f"PR_NUMBER={pr_num_int}")
 print(f"PR_URL=\"{sh(pr_url)}\"")
 print(f"PR_REVIEW=\"{sh(pr_review)}\"")
+print(f"PR_KIND=\"{sh(pr_kind)}\"")
 print(f"WORKSPACE_DIR=\"{sh(workspace_dir)}\"")
 print(f"SL_LATEST_VERSION=\"{sh(sl_latest_version)}\"")
 print(f"SL_NEEDS_UPDATE={sl_needs_update}")
@@ -413,6 +535,8 @@ if [ -n "$WORKTREE_NAME" ]; then
 fi
 # PR badge — open PR for the current branch (pr.* fields)
 if [ "${PR_NUMBER:-0}" -gt 0 ] 2>/dev/null; then
+  # Remote code-review sessions get a magnifier regardless of theme
+  [ "$PR_KIND" = "cr" ] && PR_ICON="🔍"
   case "$PR_REVIEW" in
     approved)          pr_glyph="✓"; pr_color="$BRIGHT_GREEN" ;;
     pending)           pr_glyph="…"; pr_color="$BRIGHT_YELLOW" ;;
