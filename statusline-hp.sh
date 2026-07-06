@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.6.1"
+STATUSLINE_HP_VERSION="0.6.2"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -133,20 +133,18 @@ ctx_size = g(d, "context_window", "context_window_size") or 0
 is_1m_ctx = 1 if ctx_size >= 1_000_000 else 0
 thinking_on = 1 if g(d, "thinking", "enabled") else 0
 
-# Live effort from spec (reflects mid-session /effort changes).
-# Falls back to settings.json for models that omit effort.level (e.g. Haiku).
-runtime_effort = (g(d, "effort", "level") or "").lower()
-settings_effort = ""
+# Live effort from spec (reflects mid-session /effort changes). Claude Code
+# emits effort.level only for effort-capable models, so absence means the
+# session is not running effort — display nothing. settings.json effortLevel
+# is the default for NEW sessions, never live state, so it is not a fallback.
+effort = (g(d, "effort", "level") or "").lower()
 theme_file = ""
 try:
     with open(os.path.expanduser("~/.claude/settings.json")) as f:
         s = json.load(f)
-        settings_effort = s.get("effortLevel", "")
         theme_file = (s.get("env") or {}).get("STATUSLINE_THEME", "")
 except:
     pass
-
-effort = runtime_effort or settings_effort
 
 # Latest version from the Claude Code changelog cache
 latest_version = ""
@@ -384,9 +382,10 @@ ctx_bar() {
 parts_row1=""
 parts_row2=""
 
-# Model name + effort level
+# Model name + effort level (purely payload-driven — no model-name mask;
+# effort-less models like Haiku simply never receive effort.level)
 EFFORT_ICON=""
-if [[ "$MODEL" != *"Haiku"* ]] && [ -n "$EFFORT" ]; then
+if [ -n "$EFFORT" ]; then
   # Case-insensitive match so "Max"/"max"/"MAX" all work
   case "${EFFORT,,}" in
     max)    EFFORT_ICON="${EFFORT_MAX_STYLE}${EFFORT_MAX}${RESET}" ;;

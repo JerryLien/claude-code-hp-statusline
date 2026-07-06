@@ -5,6 +5,12 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-07-06
+
+- Fixed phantom effort badge on effort-less models (e.g. `⇈xhigh` shown on Sonnet 4.5): Claude Code emits `effort.level` only for effort-capable models (reverse-engineered v2.1.201 — hardcoded denylist covers `claude-3-*`, `opus-4-0/4-1`, `sonnet-4-0`, `sonnet-4-5`, `haiku-4-5`), so field absence means "not running effort". The settings.json `effortLevel` fallback displayed the *new-session default* as if it were live session state, and only ever became visible exactly when it was wrong — removed; effort is now purely payload-driven
+- Removed the `*Haiku*` model-name mask that was papering over the same bug for Haiku — no model allow-lists; if Claude Code ever emits `effort.level` for a future Haiku, it renders
+- Tests: 11 render cases converted from the settings-fallback helper to payload-driven `effort.level` (matches the real data flow), +5 new `c6-*` cases covering absence-means-hidden (Sonnet 4.5/Opus/bloom), Haiku-with-payload renders, Haiku-without stays hidden (136 → 140)
+
 ## [0.6.1] — 2026-07-06
 
 - `⚠200k` no longer stays permanently red in 1M-context sessions: `exceeds_200k_tokens` is a fixed 200k flag regardless of window size (verified against the Claude Code v2.1.201 payload builder), so in a 1M window it now renders as a yellow `💰200k+` pricing-tier hint (>200k input = 2x token rate) instead of a capacity alarm; the red `⚠200k` is unchanged for 200k windows (and when `context_window_size` is absent)
