@@ -16,6 +16,7 @@
   - `RESET="\033[0m"`、`BOLD="\033[1m"`、`WHITE="\033[97m"`、`CYAN="\033[36m"`、`GRAY="\033[90m"`（區塊內已有）
   - 本次新增：`MAGENTA="\033[35m"`、`BRIGHT_RED="\033[91m"`、`BRIGHT_YELLOW="\033[93m"`、`RED="\033[31m"`、`YELLOW="\033[33m"`、`REVERSE="\033[7m"`
 - **變色門檻**（與主列 `ctx_bar` 一致）：`pct >= 90` → RED；`pct >= 70` → YELLOW；其餘 → CYAN
+- **測試 pattern 要用 JSON 編碼後的形式**：subagent 區塊的輸出是 `json.dumps()` 產生的 JSON 行，ESC（0x1b）依 JSON 規格一律被編碼成**字面的六個字元** `\u001b`（`ensure_ascii=False` 只影響非 ASCII 字元，控制字元照 escape）。因此 subagent 測試的顏色 pattern 必須寫成單引號字串 `'\u001b[90m…'`，**不能**用主列測試那種 `$'\033[90m…'`（真實 escape 位元組）——後者永遠不會命中。實測輸出：`{"id": "a", "content": "⚔ \u001b[1m…"}`
 - **既有 per-task `try/except` 不可移除**：新解析全部放在其內，單一 task 出錯不得影響其他列
 - **版本號**：完成後 `VERSION` 檔與 `statusline-hp.sh:11` 的 `STATUSLINE_HP_VERSION` 必須同為 `0.8.0`
 - **Commit message 一律英文**，conventional commits 風格，**不得含 Linear 單號**
@@ -39,20 +40,20 @@
 # --- 0.8.0: model 縮寫 ---
 assert_contains "c9-model-full-id-shortens" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-haiku-4-5-20251001","tokenCount":5}]}' \
-  $'\033[90m·haiku'
+  '\u001b[90m·haiku'
 assert_contains "c9-model-alias-passthrough" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","model":"sonnet","tokenCount":5}]}' \
-  $'\033[90m·sonnet'
+  '\u001b[90m·sonnet'
 assert_contains "c9-model-fable" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-fable-5","tokenCount":5}]}' \
-  $'\033[90m·fable'
+  '\u001b[90m·fable'
 assert_contains "c9-model-opus" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-opus-5","tokenCount":5}]}' \
-  $'\033[90m·opus'
+  '\u001b[90m·opus'
 # 未知 model：原樣小寫、截 12 字元
 assert_contains "c9-model-unknown-truncated" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","model":"Claude-Zeta-1-Preview-2027","tokenCount":5}]}' \
-  $'\033[90m·claude-zeta-'
+  '\u001b[90m·claude-zeta-'
 # 缺席／空字串／inherit 都不顯示分隔符
 assert_not_contains "c9-model-absent-no-dot" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5}]}' \
@@ -144,23 +145,23 @@ git commit -m "feat(subagent): show shortened model name per task row"
 # rpg：符號 + 主列同款 ANSI
 assert_contains "c9-effort-max-rpg" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
-  $'\033[7m\033[1m\033[35m★'
+  '\u001b[7m\u001b[1m\u001b[35m★'
 assert_contains "c9-effort-xhigh-rpg" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"xhigh","tokenCount":5}]}' \
-  $'\033[1m\033[35m⇈'
+  '\u001b[1m\u001b[35m⇈'
 assert_contains "c9-effort-high-rpg" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
-  $'\033[91m↑'
+  '\u001b[91m↑'
 assert_contains "c9-effort-medium-rpg" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"medium","tokenCount":5}]}' \
-  $'\033[93m~'
+  '\u001b[93m~'
 assert_contains "c9-effort-low-rpg" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"low","tokenCount":5}]}' \
-  $'\033[90m↓'
+  '\u001b[90m↓'
 # 大小寫不敏感
 assert_contains "c9-effort-case-insensitive" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"HIGH","tokenCount":5}]}' \
-  $'\033[91m↑'
+  '\u001b[91m↑'
 # bloom：emoji 自帶顏色，不加 ANSI（max 也不反白）
 assert_contains "c9-effort-max-bloom" "bloom" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
@@ -170,14 +171,14 @@ assert_contains "c9-effort-high-bloom" "bloom" \
   "🔴"
 assert_not_contains "c9-effort-max-bloom-no-reverse" "bloom" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
-  $'\033[7m'
+  '\u001b[7m'
 # 數字 token budget → compact 灰字，不配符號
 assert_contains "c9-effort-numeric-budget" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":30000,"tokenCount":5}]}' \
-  $'\033[90m30.0k'
+  '\u001b[90m30.0k'
 assert_contains "c9-effort-numeric-string-budget" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"30000","tokenCount":5}]}' \
-  $'\033[90m30.0k'
+  '\u001b[90m30.0k'
 # 缺席（繼承 session effort）不顯示
 assert_not_contains "c9-effort-absent-rpg" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5}]}' \
@@ -189,7 +190,7 @@ assert_not_contains "c9-effort-unknown-level" "rpg" \
 # model + effort 並存的完整組合
 assert_contains "c9-model-and-effort-together" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","model":"haiku","effort":"high","tokenCount":5}]}' \
-  $'\033[90m·haiku\033[0m\033[91m↑'
+  '\u001b[90m·haiku\u001b[0m\u001b[91m↑'
 # model 缺席但 effort 存在：符號直接接名稱，不出現分隔符
 assert_not_contains "c9-effort-without-model-no-dot" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
@@ -322,27 +323,27 @@ git commit -m "feat(subagent): show per-task reasoning effort badge"
 # 69% → CYAN（邊界下緣）
 assert_contains "c9-token-color-cyan-69" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":69000,"contextWindowSize":100000}]}' \
-  $'\033[36m69.0k'
+  '\u001b[36m69.0k'
 # 70% → YELLOW（邊界）
 assert_contains "c9-token-color-yellow-70" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":70000,"contextWindowSize":100000}]}' \
-  $'\033[33m70.0k'
+  '\u001b[33m70.0k'
 # 89% → YELLOW（邊界上緣）
 assert_contains "c9-token-color-yellow-89" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":89000,"contextWindowSize":100000}]}' \
-  $'\033[33m89.0k'
+  '\u001b[33m89.0k'
 # 90% → RED（邊界）
 assert_contains "c9-token-color-red-90" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":90000,"contextWindowSize":100000}]}' \
-  $'\033[31m90.0k'
+  '\u001b[31m90.0k'
 # 超過 100% 仍是紅、數字照實顯示
 assert_contains "c9-token-color-red-over-100" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":150000,"contextWindowSize":100000}]}' \
-  $'\033[31m150.0k'
+  '\u001b[31m150.0k'
 # contextWindowSize 缺席 → 不變色（維持現行白字，輸出僅有裸 token 數）
 assert_not_contains "c9-token-no-ctxsize-no-color" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":38200}]}' \
-  $'\033[36m38.2k'
+  '\u001b[36m38.2k'
 assert_contains "c9-token-no-ctxsize-plain" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":38200}]}' \
   "38.2k"
@@ -353,11 +354,11 @@ assert_contains "c9-token-zero-ctxsize-plain" "rpg" \
 # tokenCount 缺席視為 0 → CYAN
 assert_contains "c9-token-absent-count-cyan" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","contextWindowSize":100000}]}' \
-  $'\033[36m0'
+  '\u001b[36m0'
 # bloom 主題共用同一套門檻
 assert_contains "c9-token-color-red-bloom" "bloom" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":95000,"contextWindowSize":100000}]}' \
-  $'\033[31m95.0k'
+  '\u001b[31m95.0k'
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
