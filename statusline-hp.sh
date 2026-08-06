@@ -132,7 +132,7 @@ def effort_badge(v):
     if isinstance(v, bool) or v is None:
         return ""
     if isinstance(v, (int, float)):
-        return f"{GRAY}{compact(v)}{RESET}"
+        return f"{GRAY} {compact(v)}{RESET}"
     if not isinstance(v, str):
         return ""
     s = v.strip()
@@ -142,7 +142,7 @@ def effort_badge(v):
     if lvl in EFFORTS:
         return f"{EFFORT_STYLES[lvl]}{EFFORTS[lvl]}{RESET}"
     try:
-        return f"{GRAY}{compact(float(s))}{RESET}"
+        return f"{GRAY} {compact(float(s))}{RESET}"
     except (TypeError, ValueError):
         return ""
 

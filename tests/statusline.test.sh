@@ -621,7 +621,6 @@ assert_contains "c9-tasks-substring-main-mode" "rpg" \
   '{"model":{"display_name":"Opus"},"session_name":"my-tasks-list"}' \
   "#my-tasks-list"
 
-
 # --- 0.8.0: model 縮寫 ---
 assert_contains "c9-model-full-id-shortens" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-haiku-4-5-20251001","tokenCount":5}]}' \
@@ -688,10 +687,10 @@ assert_not_contains "c9-effort-max-bloom-no-reverse" "bloom" \
 # 數字 token budget → compact 灰字，不配符號
 assert_contains "c9-effort-numeric-budget" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":30000,"tokenCount":5}]}' \
-  '\u001b[90m30.0k'
+  '\u001b[90m 30.0k'
 assert_contains "c9-effort-numeric-string-budget" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"30000","tokenCount":5}]}' \
-  '\u001b[90m30.0k'
+  '\u001b[90m 30.0k'
 # 缺席（繼承 session effort）不顯示
 assert_not_contains "c9-effort-absent-rpg" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5}]}' \

@@ -35,7 +35,7 @@ The default status line tells you very little. This one turns everything that ma
 
 ### Always visible
 
-- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / max). RPG: ↓low / ~medium / ↑high / ⇈xhigh / ★max · Bloom: 🔵 low / 🟡 medium / 🔴 high / 🟣 xhigh / ⚫ max. Reads the live `effort.level` from Claude Code, so mid-session `/effort` changes show up immediately. Falls back to `effortLevel` in `settings.json` for models that don't expose effort
+- **Model + Effort** — Current model and effort level (low / medium / high / xhigh / max). RPG: ↓low / ~medium / ↑high / ⇈xhigh / ★max · Bloom: 🔵 low / 🟡 medium / 🔴 high / 🟣 xhigh / ⚫ max. Reads the live `effort.level` from Claude Code, so mid-session `/effort` changes show up immediately
 - **[1M] badge** — Cyan `[1M]` next to the model name when the session is running with a 1M-token context window (`context_window.context_window_size >= 1000000`). Hidden for the 200k default
 - **💭 Thinking** — Magenta thought-bubble next to the model name when extended thinking is enabled for the session
 - **Output style** — Current output style name when set to a non-default value (📖 RPG · 🌻 Bloom)
@@ -95,8 +95,9 @@ Claude Code's default rendering automatically.
 Since 0.8.0 each row also carries three per-task details:
 
 - **`·model`** — the task model as a short name (`·haiku`, `·sonnet`, `·opus`,
-  `·fable`). An unrecognised model id shows the raw value truncated to 12
-  characters; the segment is omitted when the field is absent or `inherit`.
+  `·fable`). An unrecognised model id shows the value lower-cased and
+  truncated to 12 characters; the segment is omitted when the field is
+  absent or `inherit`.
 - **Effort symbol** — the task reasoning effort as `★` max, `⇈` xhigh, `↑` high,
   `~` medium, `↓` low in RPG (`⚫🟣🔴🟡🔵` in Bloom), coloured to match the main
   row. A numeric token budget renders compact in grey. Nothing renders when the
@@ -117,6 +118,16 @@ change without notice in future releases):
 
 If either badge silently disappears after a Claude Code upgrade, these fields
 are the first thing to re-verify.
+
+A third thing worth tracking is a payload-shape divergence rather than a
+missing field (verified against Claude Code 2.1.223):
+
+- **Reasoning effort** — the main status-line payload nests it as an object
+  (`effort.level`), while the subagent `tasks[]` payload carries the same
+  concept flat (`tasks[].effort`). Both shapes are handled today. If a future
+  release normalises the task field to the object form, the per-task effort
+  badge would silently stop rendering rather than error — worth re-checking
+  alongside the two fields above after any Claude Code upgrade.
 
 ## Requirements
 
