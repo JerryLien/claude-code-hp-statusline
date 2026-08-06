@@ -621,6 +621,134 @@ assert_contains "c9-tasks-substring-main-mode" "rpg" \
   '{"model":{"display_name":"Opus"},"session_name":"my-tasks-list"}' \
   "#my-tasks-list"
 
+# --- 0.8.0: model 縮寫 ---
+assert_contains "c9-model-full-id-shortens" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-haiku-4-5-20251001","tokenCount":5}]}' \
+  '\u001b[90m·haiku'
+assert_contains "c9-model-alias-passthrough" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"sonnet","tokenCount":5}]}' \
+  '\u001b[90m·sonnet'
+assert_contains "c9-model-fable" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-fable-5","tokenCount":5}]}' \
+  '\u001b[90m·fable'
+assert_contains "c9-model-opus" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-opus-5","tokenCount":5}]}' \
+  '\u001b[90m·opus'
+# 未知 model：原樣小寫、截 12 字元
+assert_contains "c9-model-unknown-truncated" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"Claude-Zeta-1-Preview-2027","tokenCount":5}]}' \
+  '\u001b[90m·claude-zeta-'
+# 缺席／空字串／inherit 都不顯示分隔符
+assert_not_contains "c9-model-absent-no-dot" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5}]}' \
+  "·"
+assert_not_contains "c9-model-inherit-no-dot" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"inherit","tokenCount":5}]}' \
+  "·"
+assert_not_contains "c9-model-empty-no-dot" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"","tokenCount":5}]}' \
+  "·"
+# 型別怪異不得炸掉該列
+assert_contains "c9-model-non-string-survives" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"survivor","model":123,"tokenCount":5}]}' \
+  "survivor"
+
+# --- 0.8.0: effort 短符號 ---
+# rpg：符號 + 主列同款 ANSI
+assert_contains "c9-effort-max-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
+  '\u001b[7m\u001b[1m\u001b[35m★'
+assert_contains "c9-effort-xhigh-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"xhigh","tokenCount":5}]}' \
+  '\u001b[1m\u001b[35m⇈'
+assert_contains "c9-effort-high-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
+  '\u001b[91m↑'
+assert_contains "c9-effort-medium-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"medium","tokenCount":5}]}' \
+  '\u001b[93m~'
+assert_contains "c9-effort-low-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"low","tokenCount":5}]}' \
+  '\u001b[90m↓'
+# 大小寫不敏感
+assert_contains "c9-effort-case-insensitive" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"HIGH","tokenCount":5}]}' \
+  '\u001b[91m↑'
+# bloom：emoji 自帶顏色，不加 ANSI（max 也不反白）
+assert_contains "c9-effort-max-bloom" "bloom" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
+  "⚫"
+assert_contains "c9-effort-high-bloom" "bloom" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
+  "🔴"
+assert_not_contains "c9-effort-max-bloom-no-reverse" "bloom" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
+  '\u001b[7m'
+# 數字 token budget → compact 灰字，不配符號
+assert_contains "c9-effort-numeric-budget" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":30000,"tokenCount":5}]}' \
+  '\u001b[90m 30.0k'
+assert_contains "c9-effort-numeric-string-budget" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"30000","tokenCount":5}]}' \
+  '\u001b[90m 30.0k'
+# 缺席（繼承 session effort）不顯示
+assert_not_contains "c9-effort-absent-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5}]}' \
+  "↑"
+# 未知等級字串不顯示
+assert_not_contains "c9-effort-unknown-level" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"ludicrous","tokenCount":5}]}' \
+  "★"
+# model + effort 並存的完整組合
+assert_contains "c9-model-and-effort-together" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"haiku","effort":"high","tokenCount":5}]}' \
+  '\u001b[90m·haiku\u001b[0m\u001b[91m↑'
+# model 缺席但 effort 存在：符號直接接名稱，不出現分隔符
+assert_not_contains "c9-effort-without-model-no-dot" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
+  "·"
+
+# --- 0.8.0: token 數 HP 變色（門檻同主列 ctx_bar：>=90 紅、>=70 黃、其餘青）---
+# 69% → CYAN（邊界下緣）
+assert_contains "c9-token-color-cyan-69" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":69000,"contextWindowSize":100000}]}' \
+  '\u001b[36m69.0k'
+# 70% → YELLOW（邊界）
+assert_contains "c9-token-color-yellow-70" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":70000,"contextWindowSize":100000}]}' \
+  '\u001b[33m70.0k'
+# 89% → YELLOW（邊界上緣）
+assert_contains "c9-token-color-yellow-89" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":89000,"contextWindowSize":100000}]}' \
+  '\u001b[33m89.0k'
+# 90% → RED（邊界）
+assert_contains "c9-token-color-red-90" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":90000,"contextWindowSize":100000}]}' \
+  '\u001b[31m90.0k'
+# 超過 100% 仍是紅、數字照實顯示
+assert_contains "c9-token-color-red-over-100" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":150000,"contextWindowSize":100000}]}' \
+  '\u001b[31m150.0k'
+# contextWindowSize 缺席 → 不變色（維持現行白字，輸出僅有裸 token 數）
+assert_not_contains "c9-token-no-ctxsize-no-color" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":38200}]}' \
+  '\u001b[36m38.2k'
+assert_contains "c9-token-no-ctxsize-plain" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":38200}]}' \
+  "38.2k"
+# contextWindowSize 為 0 → 不變色（不得除以零）
+assert_contains "c9-token-zero-ctxsize-plain" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":38200,"contextWindowSize":0}]}' \
+  "38.2k"
+# tokenCount 缺席視為 0 → CYAN
+assert_contains "c9-token-absent-count-cyan" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","contextWindowSize":100000}]}' \
+  '\u001b[36m0'
+# bloom 主題共用同一套門檻
+assert_contains "c9-token-color-red-bloom" "bloom" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":95000,"contextWindowSize":100000}]}' \
+  '\u001b[31m95.0k'
+
 # Helper: run statusline with a latest-version cache file present
 run_with_sl_latest() {
   local latest=$1 theme=$2 json=$3

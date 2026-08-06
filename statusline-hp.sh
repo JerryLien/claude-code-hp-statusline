@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.7.0"
+STATUSLINE_HP_VERSION="0.8.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -44,14 +44,28 @@ bloom = theme == "bloom"
 
 RESET = "\033[0m"; BOLD = "\033[1m"; WHITE = "\033[97m"
 CYAN = "\033[36m"; GRAY = "\033[90m"
+MAGENTA = "\033[35m"; BRIGHT_RED = "\033[91m"; BRIGHT_YELLOW = "\033[93m"
+RED = "\033[31m"; YELLOW = "\033[33m"; REVERSE = "\033[7m"
 if bloom:
     DONE = {"completed": "\U0001F338", "failed": "\U0001F940", "killed": "\U0001F940"}
     RUN = "\U0001F331"; WAIT = "\U0001F4A4"; CLOCK = "⏱"
     SPARK = ["\U0001F331", "\U0001F33F", "\U0001F338", "\U0001F33C"]; SPARK_N = 4
+    EFFORTS = {
+        "max": "⚫", "xhigh": "\U0001F7E3", "high": "\U0001F534",
+        "medium": "\U0001F7E1", "low": "\U0001F535",
+    }
+    EFFORT_STYLES = {"max": "", "xhigh": "", "high": "", "medium": "", "low": ""}
 else:
     DONE = {"completed": "\U0001F480", "failed": "☠", "killed": "☠"}
     RUN = "⚔"; WAIT = "⏳"; CLOCK = "♔"
     SPARK = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]; SPARK_N = 8
+    EFFORTS = {
+        "max": "★", "xhigh": "⇈", "high": "↑", "medium": "~", "low": "↓",
+    }
+    EFFORT_STYLES = {
+        "max": REVERSE + BOLD + MAGENTA, "xhigh": BOLD + MAGENTA,
+        "high": BRIGHT_RED, "medium": BRIGHT_YELLOW, "low": GRAY,
+    }
 
 WAITING = ("queued", "waiting", "idle", "awaiting_approval", "awaiting approval")
 
@@ -97,6 +111,58 @@ def elapsed(start_ms):
         return f"{m}m{s:02d}s"
     return f"{s}s"
 
+MODEL_SHORTS = ("fable", "opus", "sonnet", "haiku")
+
+def short_model(v):
+    # Normalise a model id or alias to a short display name.
+    # Values arrive as either a full id (claude-haiku-4-5-20251001) or an alias (haiku).
+    if not isinstance(v, str):
+        return ""
+    s = v.strip().lower()
+    if not s or s == "inherit":
+        return ""
+    for name in MODEL_SHORTS:
+        if name in s:
+            return name
+    return s[:12]
+
+def effort_badge(v):
+    # Per-task reasoning effort: either a level string or a numeric token budget.
+    # Absent means the subagent inherits the session level, so render nothing.
+    if isinstance(v, bool) or v is None:
+        return ""
+    if isinstance(v, (int, float)):
+        return f"{GRAY} {compact(v)}{RESET}"
+    if not isinstance(v, str):
+        return ""
+    s = v.strip()
+    if not s:
+        return ""
+    lvl = s.lower()
+    if lvl in EFFORTS:
+        return f"{EFFORT_STYLES[lvl]}{EFFORTS[lvl]}{RESET}"
+    try:
+        return f"{GRAY} {compact(float(s))}{RESET}"
+    except (TypeError, ValueError):
+        return ""
+
+def token_color(count, size):
+    # Colour the token count by context usage, using the same thresholds as the
+    # main row context bar. Missing or non-positive window size means no colour.
+    try:
+        size = float(size)
+        count = float(count)
+    except (TypeError, ValueError):
+        return ""
+    if size <= 0:
+        return ""
+    pct = int(count * 100 / size)
+    if pct >= 90:
+        return RED
+    if pct >= 70:
+        return YELLOW
+    return CYAN
+
 for t in tasks:
     try:
         tid = t.get("id")
@@ -111,10 +177,18 @@ for t in tasks:
             glyph = RUN
         name = t.get("name") or t.get("label") or t.get("description") or t.get("type") or "agent"
         parts = [glyph, f"{BOLD}{WHITE}{str(name)}{RESET}"]
+        sm = short_model(t.get("model"))
+        if sm:
+            parts[-1] += f"{GRAY}·{sm}{RESET}"
+        eb = effort_badge(t.get("effort"))
+        if eb:
+            parts[-1] += eb
         sp = spark(t.get("tokenSamples"))
         if sp:
             parts.append(sp if bloom else f"{CYAN}{sp}{RESET}")
-        parts.append(compact(t.get("tokenCount") or 0))
+        tc = t.get("tokenCount") or 0
+        tcol = token_color(tc, t.get("contextWindowSize"))
+        parts.append(f"{tcol}{compact(tc)}{RESET}" if tcol else compact(tc))
         el = elapsed(t.get("startTime"))
         if el:
             parts.append(f"{GRAY}{CLOCK}{el}{RESET}")
