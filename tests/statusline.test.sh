@@ -654,6 +654,61 @@ assert_contains "c9-model-non-string-survives" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"survivor","model":123,"tokenCount":5}]}' \
   "survivor"
 
+# --- 0.8.0: effort 短符號 ---
+# rpg：符號 + 主列同款 ANSI
+assert_contains "c9-effort-max-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
+  '\u001b[7m\u001b[1m\u001b[35m★'
+assert_contains "c9-effort-xhigh-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"xhigh","tokenCount":5}]}' \
+  '\u001b[1m\u001b[35m⇈'
+assert_contains "c9-effort-high-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
+  '\u001b[91m↑'
+assert_contains "c9-effort-medium-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"medium","tokenCount":5}]}' \
+  '\u001b[93m~'
+assert_contains "c9-effort-low-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"low","tokenCount":5}]}' \
+  '\u001b[90m↓'
+# 大小寫不敏感
+assert_contains "c9-effort-case-insensitive" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"HIGH","tokenCount":5}]}' \
+  '\u001b[91m↑'
+# bloom：emoji 自帶顏色，不加 ANSI（max 也不反白）
+assert_contains "c9-effort-max-bloom" "bloom" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
+  "⚫"
+assert_contains "c9-effort-high-bloom" "bloom" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
+  "🔴"
+assert_not_contains "c9-effort-max-bloom-no-reverse" "bloom" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"max","tokenCount":5}]}' \
+  '\u001b[7m'
+# 數字 token budget → compact 灰字，不配符號
+assert_contains "c9-effort-numeric-budget" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":30000,"tokenCount":5}]}' \
+  '\u001b[90m30.0k'
+assert_contains "c9-effort-numeric-string-budget" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"30000","tokenCount":5}]}' \
+  '\u001b[90m30.0k'
+# 缺席（繼承 session effort）不顯示
+assert_not_contains "c9-effort-absent-rpg" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5}]}' \
+  "↑"
+# 未知等級字串不顯示
+assert_not_contains "c9-effort-unknown-level" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"ludicrous","tokenCount":5}]}' \
+  "★"
+# model + effort 並存的完整組合
+assert_contains "c9-model-and-effort-together" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"haiku","effort":"high","tokenCount":5}]}' \
+  '\u001b[90m·haiku\u001b[0m\u001b[91m↑'
+# model 缺席但 effort 存在：符號直接接名稱，不出現分隔符
+assert_not_contains "c9-effort-without-model-no-dot" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
+  "·"
+
 # Helper: run statusline with a latest-version cache file present
 run_with_sl_latest() {
   local latest=$1 theme=$2 json=$3
