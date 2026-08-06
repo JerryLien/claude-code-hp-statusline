@@ -86,10 +86,25 @@ the `tasks[]` payload and switches modes:
 ```
 
 Each running subagent gets a themed row: status glyph (RPG `⚔` running / `💀`
-completed / `☠` failed; Bloom `🌱` / `🌸` / `🥀`), agent name, a token-burn
-sparkline built from the recent `tokenSamples` history (`▂▃▅█` in RPG, flower
-stages in Bloom), the compact token total, and elapsed time. Rows the script
-cannot render fall back to Claude Code's default rendering automatically.
+completed / `☠` failed; Bloom `🌱` / `🌸` / `🥀`), agent name, the model short
+name and reasoning effort, a token-burn sparkline built from the recent
+`tokenSamples` history (`▂▃▅█` in RPG, flower stages in Bloom), the compact
+token total, and elapsed time. Rows the script cannot render fall back to
+Claude Code's default rendering automatically.
+
+Since 0.8.0 each row also carries three per-task details:
+
+- **`·model`** — the task model as a short name (`·haiku`, `·sonnet`, `·opus`,
+  `·fable`). An unrecognised model id shows the raw value truncated to 12
+  characters; the segment is omitted when the field is absent or `inherit`.
+- **Effort symbol** — the task reasoning effort as `★` max, `⇈` xhigh, `↑` high,
+  `~` medium, `↓` low in RPG (`⚫🟣🔴🟡🔵` in Bloom), coloured to match the main
+  row. A numeric token budget renders compact in grey. Nothing renders when the
+  subagent inherits the session effort. Requires Claude Code 2.1.214 or later.
+- **Token colour** — the token total is coloured by context usage
+  (`tokenCount / contextWindowSize`) on the same thresholds as the main row
+  context bar: cyan below 70%, yellow from 70%, red from 90%. Rows without
+  `contextWindowSize` stay uncoloured.
 
 ## Field compatibility notes
 

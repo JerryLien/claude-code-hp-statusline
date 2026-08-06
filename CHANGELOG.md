@@ -5,6 +5,12 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## 0.8.0
+
+- Subagent rows now show the per-task model as a short name (`·haiku`, `·sonnet`, `·opus`, `·fable`); unknown model ids fall back to the raw value truncated to 12 characters, and the segment is omitted when the field is absent or `inherit`
+- Subagent rows now show the per-task reasoning effort as a themed symbol (RPG `★⇈↑~↓`, Bloom `⚫🟣🔴🟡🔵`) matching the main row colours; a numeric token budget renders compact in grey, and an absent field (subagent inherits the session level) renders nothing. Requires Claude Code 2.1.214 or later
+- Subagent token counts are now coloured by context usage (`tokenCount / contextWindowSize`) using the same thresholds as the main row context bar: cyan below 70%, yellow from 70%, red from 90%. Rows without `contextWindowSize` stay uncoloured
+
 ## [0.7.0] — 2026-07-06
 
 - **Subagent status line**: point the `subagentStatusLine` setting at the same script — it auto-detects the `tasks[]` payload (structural check, not just the substring probe) and emits one `{"id","content"}` JSON line per task. Rows show a themed status glyph (RPG `⚔`/`💀`/`☠`/`⏳`, Bloom `🌱`/`🌸`/`🥀`/`💤`), the agent name (fallback chain `name → label → description → type`), a token-burn sparkline from `tokenSamples` deltas (`▁▂▃▄▅▆▇█` in RPG, 4 flower stages in Bloom), the compact token total, and elapsed time (`♔1m24s` / `⏱1m24s`). Per-task render errors skip that line so Claude Code falls back to its default row. Contract verified against the v2.1.201 payload builder (5s cadence, 5s timeout, ANSI + OSC 8 supported, partial output allowed)
