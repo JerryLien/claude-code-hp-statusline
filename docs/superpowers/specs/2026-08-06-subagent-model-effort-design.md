@@ -62,15 +62,15 @@ bloom: 🌱 code-reviewer▸·haiku🟣 🌱🌿🌸 34.5k ⏱2m10s
 
 只取主列 effort 符號、不帶等級文字，接在 model 縮寫後（無空格）：
 
-| 等級 | rpg | bloom |
-|---|---|---|
-| max | `★`（粗體黃） | `⚫` |
-| xhigh | `⇈`（粗體洋紅） | `🟣` |
-| high | `↑`（紅） | `🔴` |
-| medium | `~`（黃） | `🟡` |
-| low | `↓`（藍） | `🔵` |
+| 等級 | rpg | rpg 樣式（同主列 `EFFORT_*_STYLE`） | bloom |
+|---|---|---|---|
+| max | `★` | 反白＋粗體＋洋紅 `\033[7m\033[1m\033[35m` | `⚫` |
+| xhigh | `⇈` | 粗體＋洋紅 `\033[1m\033[35m` | `🟣` |
+| high | `↑` | 亮紅 `\033[91m` | `🔴` |
+| medium | `~` | 亮黃 `\033[93m` | `🟡` |
+| low | `↓` | 灰 `\033[90m` | `🔵` |
 
-- rpg 的顏色沿用主列 `EFFORT_*_STYLE` 同款 ANSI；bloom 的 emoji 自帶顏色不加 ANSI
+- rpg 的顏色逐一對齊主列 `EFFORT_*_STYLE` 實際值（上表已從 `statusline-hp.sh:381-385, 406-410` 查證）；bloom 主列的 `EFFORT_*_STYLE` 除 max 為反白外皆為空字串，subagent 列比照辦理：emoji 自帶顏色，不加 ANSI，max 也不加反白（單一 emoji 反白顯示怪異）
 - 比對不分大小寫（同主列 `${EFFORT,,}` 慣例）
 - **數字 token budget**：以既有 `compact()` 格式灰字顯示（30000 → `30.0k`），不配符號；數字與全數字字串（`30000` / `"30000"`）皆走此路徑
 - 欄位缺席（繼承 session effort）或空字串：不顯示
