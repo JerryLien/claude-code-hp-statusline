@@ -621,6 +621,39 @@ assert_contains "c9-tasks-substring-main-mode" "rpg" \
   '{"model":{"display_name":"Opus"},"session_name":"my-tasks-list"}' \
   "#my-tasks-list"
 
+
+# --- 0.8.0: model 縮寫 ---
+assert_contains "c9-model-full-id-shortens" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-haiku-4-5-20251001","tokenCount":5}]}' \
+  '\u001b[90m·haiku'
+assert_contains "c9-model-alias-passthrough" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"sonnet","tokenCount":5}]}' \
+  '\u001b[90m·sonnet'
+assert_contains "c9-model-fable" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-fable-5","tokenCount":5}]}' \
+  '\u001b[90m·fable'
+assert_contains "c9-model-opus" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"claude-opus-5","tokenCount":5}]}' \
+  '\u001b[90m·opus'
+# 未知 model：原樣小寫、截 12 字元
+assert_contains "c9-model-unknown-truncated" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"Claude-Zeta-1-Preview-2027","tokenCount":5}]}' \
+  '\u001b[90m·claude-zeta-'
+# 缺席／空字串／inherit 都不顯示分隔符
+assert_not_contains "c9-model-absent-no-dot" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5}]}' \
+  "·"
+assert_not_contains "c9-model-inherit-no-dot" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"inherit","tokenCount":5}]}' \
+  "·"
+assert_not_contains "c9-model-empty-no-dot" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","model":"","tokenCount":5}]}' \
+  "·"
+# 型別怪異不得炸掉該列
+assert_contains "c9-model-non-string-survives" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"survivor","model":123,"tokenCount":5}]}' \
+  "survivor"
+
 # Helper: run statusline with a latest-version cache file present
 run_with_sl_latest() {
   local latest=$1 theme=$2 json=$3

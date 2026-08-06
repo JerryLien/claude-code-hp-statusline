@@ -97,6 +97,21 @@ def elapsed(start_ms):
         return f"{m}m{s:02d}s"
     return f"{s}s"
 
+MODEL_SHORTS = ("fable", "opus", "sonnet", "haiku")
+
+def short_model(v):
+    # Normalise a model id or alias to a short display name.
+    # Values arrive as either a full id (claude-haiku-4-5-20251001) or an alias (haiku).
+    if not isinstance(v, str):
+        return ""
+    s = v.strip().lower()
+    if not s or s == "inherit":
+        return ""
+    for name in MODEL_SHORTS:
+        if name in s:
+            return name
+    return s[:12]
+
 for t in tasks:
     try:
         tid = t.get("id")
@@ -111,6 +126,9 @@ for t in tasks:
             glyph = RUN
         name = t.get("name") or t.get("label") or t.get("description") or t.get("type") or "agent"
         parts = [glyph, f"{BOLD}{WHITE}{str(name)}{RESET}"]
+        sm = short_model(t.get("model"))
+        if sm:
+            parts[-1] += f"{GRAY}·{sm}{RESET}"
         sp = spark(t.get("tokenSamples"))
         if sp:
             parts.append(sp if bloom else f"{CYAN}{sp}{RESET}")
