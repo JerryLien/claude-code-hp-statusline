@@ -146,6 +146,23 @@ def effort_badge(v):
     except (TypeError, ValueError):
         return ""
 
+def token_color(count, size):
+    # Colour the token count by context usage, using the same thresholds as the
+    # main row context bar. Missing or non-positive window size means no colour.
+    try:
+        size = float(size)
+        count = float(count)
+    except (TypeError, ValueError):
+        return ""
+    if size <= 0:
+        return ""
+    pct = int(count * 100 / size)
+    if pct >= 90:
+        return RED
+    if pct >= 70:
+        return YELLOW
+    return CYAN
+
 for t in tasks:
     try:
         tid = t.get("id")
@@ -169,7 +186,9 @@ for t in tasks:
         sp = spark(t.get("tokenSamples"))
         if sp:
             parts.append(sp if bloom else f"{CYAN}{sp}{RESET}")
-        parts.append(compact(t.get("tokenCount") or 0))
+        tc = t.get("tokenCount") or 0
+        tcol = token_color(tc, t.get("contextWindowSize"))
+        parts.append(f"{tcol}{compact(tc)}{RESET}" if tcol else compact(tc))
         el = elapsed(t.get("startTime"))
         if el:
             parts.append(f"{GRAY}{CLOCK}{el}{RESET}")

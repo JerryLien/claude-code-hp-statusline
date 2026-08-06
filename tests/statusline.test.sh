@@ -709,6 +709,47 @@ assert_not_contains "c9-effort-without-model-no-dot" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","effort":"high","tokenCount":5}]}' \
   "·"
 
+# --- 0.8.0: token 數 HP 變色（門檻同主列 ctx_bar：>=90 紅、>=70 黃、其餘青）---
+# 69% → CYAN（邊界下緣）
+assert_contains "c9-token-color-cyan-69" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":69000,"contextWindowSize":100000}]}' \
+  '\u001b[36m69.0k'
+# 70% → YELLOW（邊界）
+assert_contains "c9-token-color-yellow-70" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":70000,"contextWindowSize":100000}]}' \
+  '\u001b[33m70.0k'
+# 89% → YELLOW（邊界上緣）
+assert_contains "c9-token-color-yellow-89" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":89000,"contextWindowSize":100000}]}' \
+  '\u001b[33m89.0k'
+# 90% → RED（邊界）
+assert_contains "c9-token-color-red-90" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":90000,"contextWindowSize":100000}]}' \
+  '\u001b[31m90.0k'
+# 超過 100% 仍是紅、數字照實顯示
+assert_contains "c9-token-color-red-over-100" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":150000,"contextWindowSize":100000}]}' \
+  '\u001b[31m150.0k'
+# contextWindowSize 缺席 → 不變色（維持現行白字，輸出僅有裸 token 數）
+assert_not_contains "c9-token-no-ctxsize-no-color" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":38200}]}' \
+  '\u001b[36m38.2k'
+assert_contains "c9-token-no-ctxsize-plain" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":38200}]}' \
+  "38.2k"
+# contextWindowSize 為 0 → 不變色（不得除以零）
+assert_contains "c9-token-zero-ctxsize-plain" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":38200,"contextWindowSize":0}]}' \
+  "38.2k"
+# tokenCount 缺席視為 0 → CYAN
+assert_contains "c9-token-absent-count-cyan" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","contextWindowSize":100000}]}' \
+  '\u001b[36m0'
+# bloom 主題共用同一套門檻
+assert_contains "c9-token-color-red-bloom" "bloom" \
+  '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":95000,"contextWindowSize":100000}]}' \
+  '\u001b[31m95.0k'
+
 # Helper: run statusline with a latest-version cache file present
 run_with_sl_latest() {
   local latest=$1 theme=$2 json=$3
