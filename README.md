@@ -17,6 +17,7 @@ The default status line tells you very little. This one turns everything that ma
 ## Features
 
 - ❤ **Health-bar rate limits** — 5-hour and 7-day windows with countdown to reset
+- ❤ **Per-model weekly caps** — a third bar for model-scoped limits such as the Fable weekly cap (needs the optional usage hook, see below)
 - 🧠 **Context window meter** — know exactly how much headroom you have
 - ⚡ **Cache hit ratio** — realtime feedback that your prompt caching is actually working
 - ⚠ **200k threshold alert** — loud warning the moment per-token pricing jumps
@@ -52,6 +53,7 @@ The default status line tells you very little. This one turns everything that ma
 - **5h / 7d** — Rate-limit health bars for the 5-hour and 7-day rolling windows
   - 🟢 Green: safe · 🟡 Yellow: moderate · 🔴 Red: slow down!
   - ↻ Countdown to reset (e.g. `↻2h29m`, `↻1d4h`)
+- **Fable / per-model bars** — One more bar per model-scoped weekly cap, labelled with the model name, same colours and cooldown icon as 7d. Needs the optional usage hook (see [Per-model weekly caps](#per-model-weekly-caps-optional))
 
 ### Smart alerts
 
@@ -223,6 +225,51 @@ working as if the feature was off.
 
 **3.** When the badge appears, type `/statusline-update` and Claude will run the
 upgrade for you. The previous version is kept at `~/.claude/statusline-hp.sh.bak`.
+
+## Per-model weekly caps (optional)
+
+Claude.ai plans carry model-scoped weekly limits on top of the 5h / 7d windows —
+today that is the Fable weekly cap, shown by `/usage` as its own row. The
+statusline payload does not include it, so a small hook fetches it from the same
+OAuth usage endpoint `/usage` reads and caches just the numbers. When present the
+statusline draws one more health bar after `7d`, labelled with the model name:
+
+```
+❤ 5h [█████████████░░] 96% ↻1h56m  ❤ 7d [█████████████░░] 88% ↻3d22h  ❤ Fable [███████████░░░░] 78% ↻3d22h
+```
+
+**1.** Install the hook:
+
+```bash
+mkdir -p ~/.claude/hooks
+curl -fsSL -o ~/.claude/hooks/fetch-usage.sh \
+  https://raw.githubusercontent.com/JerryLien/claude-code-hp-statusline/main/hooks/fetch-usage.sh
+chmod +x ~/.claude/hooks/fetch-usage.sh
+```
+
+**2.** Wire it to `Stop` (refresh after every turn) and `SessionStart` in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "$HOME/.claude/hooks/fetch-usage.sh", "async": true } ] }
+    ],
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "$HOME/.claude/hooks/fetch-usage.sh", "async": true } ] }
+    ]
+  }
+}
+```
+
+The hook reads the OAuth token from `~/.claude/.credentials.json`, sends it only
+to `api.anthropic.com`, and writes a token-free cache
+(`~/.claude/cache/usage-limits.json`: `label`, `percent`, `resets_at`). It runs
+detached, caps the request at 5 seconds, skips when the cache is under a minute
+old, and silently no-ops for API-key users or when the network is down — the bar
+simply stays hidden. The percentage updates when a turn ends; the reset countdown
+is live. Any future per-model cap Anthropic adds shows up as another bar with no
+script change.
 
 ## Switch theme
 

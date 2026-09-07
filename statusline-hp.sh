@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.8.0"
+STATUSLINE_HP_VERSION="0.9.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -373,6 +373,23 @@ except:
     pass
 sl_needs_update = 1 if (sl_installed_version and sl_latest_version and parse_v(sl_installed_version) < parse_v(sl_latest_version)) else 0
 
+# Model-scoped weekly limits (e.g. Fable) written by hooks/fetch-usage.sh.
+# Rows whose reset time has passed are dropped, mirroring how Claude Code
+# drops an expired rate-limit window.
+scoped = []
+try:
+    with open(os.path.expanduser("~/.claude/cache/usage-limits.json")) as f:
+        for row in json.load(f):
+            label = str(row.get("label") or "")
+            reset = row.get("resets_at")
+            if not label or not isinstance(reset, (int, float)):
+                continue
+            if reset <= time.time():
+                continue
+            scoped.append((label, trunc_pct(row.get("percent")) or "0", fmt_remaining(reset), is_cooldown(row.get("percent"))))
+except:
+    scoped = []
+
 fh = five_h if five_h is not None else ""
 sd = seven_d if seven_d is not None else ""
 c = f"{cost:.4f}" if isinstance(cost, (int, float)) else ""
@@ -416,6 +433,12 @@ print(f"IS_5H_COOLDOWN={is_5h_cooldown}")
 print(f"IS_7D_COOLDOWN={is_7d_cooldown}")
 print(f"FIVE_H_INT=\"{five_h_int}\"")
 print(f"SEVEN_D_INT=\"{seven_d_int}\"")
+print(f"SCOPED_COUNT={len(scoped)}")
+for i, (lb, pc, rs, cd) in enumerate(scoped):
+    print(f"SCOPED_{i}_LABEL=\"{sh(lb)}\"")
+    print(f"SCOPED_{i}_PCT={pc}")
+    print(f"SCOPED_{i}_RESET=\"{rs}\"")
+    print(f"SCOPED_{i}_COOLDOWN={cd}")
 ' 2>/dev/null)"
 
 THEME="${STATUSLINE_THEME:-${THEME_FILE:-rpg}}"
@@ -652,6 +675,16 @@ if [ -n "$SEVEN_D" ]; then
   sd_icon="↻"; [ "${IS_7D_COOLDOWN:-0}" = "1" ] && sd_icon="$COOLDOWN_ICON"
   parts_row2+="  $(status_bar "${SEVEN_D_INT:-0}" 15 "$LABEL_7D" "$SD_RESET" "$sd_icon")"
 fi
+
+# Model-scoped weekly limits (Fable etc.) — one extra bar per row, same style as 7d
+scoped_i=0
+while [ "$scoped_i" -lt "${SCOPED_COUNT:-0}" ]; do
+  sc_label="SCOPED_${scoped_i}_LABEL"; sc_pct="SCOPED_${scoped_i}_PCT"
+  sc_reset="SCOPED_${scoped_i}_RESET"; sc_cd="SCOPED_${scoped_i}_COOLDOWN"
+  sc_icon="↻"; [ "${!sc_cd:-0}" = "1" ] && sc_icon="$COOLDOWN_ICON"
+  parts_row2+="  $(status_bar "${!sc_pct:-0}" 15 "${!sc_label}" "${!sc_reset}" "$sc_icon")"
+  scoped_i=$((scoped_i + 1))
+done
 
 # Context window
 parts_row2+="  $(ctx_bar "$CTX")"

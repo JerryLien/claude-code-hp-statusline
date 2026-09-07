@@ -6,6 +6,13 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATUSLINE="$SCRIPT_DIR/statusline-hp.sh"
 
+# Hermetic HOME: the script reads ~/.claude/cache/* (changelog, latest-version,
+# usage-limits) and ~/.claude/settings.json, so the developer's real files must
+# not leak into assertions. Helpers that need specific files create their own.
+TEST_HOME=$(mktemp -d "${TMPDIR:-/tmp}/statusline-home.XXXXXX") || exit 1
+export HOME="$TEST_HOME"
+trap 'rm -rf "$TEST_HOME"' EXIT
+
 PASS=0
 FAIL=0
 FAILED_NAMES=()
@@ -1084,6 +1091,157 @@ assert_single_line "fast-width-control-rpg"     "55" "rpg"   "$FAST_W_OFF"
 assert_multiline   "fast-width-badge-wraps-rpg" "55" "rpg"   "$FAST_W_ON"
 assert_single_line "fast-width-control-bloom"   "62" "bloom" "$FAST_W_OFF"
 assert_multiline   "fast-width-badge-wraps-bloom" "62" "bloom" "$FAST_W_ON"
+
+# === C10 model-scoped weekly limits (Fable etc.) ===
+# The companion hook (hooks/fetch-usage.sh) writes ~/.claude/cache/usage-limits.json
+# as [{"label","percent","resets_at"}]; the statusline renders one extra health bar
+# per row after 7d. Tests inject the cache via a temp HOME.
+run_with_scoped() {
+  local cache_json=$1 theme=$2 json=$3
+  local tmp output status
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/statusline.XXXXXX") || return 1
+  mkdir -p "$tmp/.claude/cache"
+  [ -n "$cache_json" ] && printf '%s\n' "$cache_json" > "$tmp/.claude/cache/usage-limits.json"
+  output=$(printf '%s\n' "$json" | HOME="$tmp" STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1)
+  status=$?
+  rm -rf "$tmp"
+  printf '%s' "$output"
+  return $status
+}
+
+assert_scoped() {
+  local mode=$1 name=$2 cache_json=$3 theme=$4 json=$5 pattern=$6
+  local output matched=0
+  output=$(run_with_scoped "$cache_json" "$theme" "$json")
+  printf '%s\n' "$output" | grep -qF "$pattern" && matched=1
+  if { [ "$mode" = contains ] && [ $matched = 1 ]; } || { [ "$mode" = not_contains ] && [ $matched = 0 ]; }; then
+    PASS=$((PASS + 1)); echo "PASS: $name"
+  else
+    FAIL=$((FAIL + 1)); FAILED_NAMES+=("$name")
+    echo "FAIL: $name ($mode '$pattern')"
+    echo "  Output:  $output"
+  fi
+}
+
+SCOPED_FUTURE=$(( $(date +%s) + 4*86400 + 7200 ))   # 4d1h59m ahead -> renders 4d1h
+SCOPED_PAST=$(( $(date +%s) - 60 ))
+SCOPED_JSON='{"model":{"display_name":"Fable"},"rate_limits":{"seven_day":{"used_percentage":12,"resets_at":'"$SCOPED_FUTURE"'}}}'
+FABLE_21="[{\"label\":\"Fable\",\"percent\":21,\"resets_at\":$SCOPED_FUTURE}]"
+
+# RPG bars show remaining HP (100 - used), Bloom shows used%; label is followed by a colour code
+assert_scoped contains     "c10-scoped-label"           "$FABLE_21" "rpg"   "$SCOPED_JSON" $'\e[97mFable '
+assert_scoped contains     "c10-scoped-percent-rpg-hp"  "$FABLE_21" "rpg"   "$SCOPED_JSON" "79%"
+assert_scoped contains     "c10-scoped-countdown"       "$FABLE_21" "rpg"   "$SCOPED_JSON" "↻4d1h"
+assert_scoped contains     "c10-scoped-bloom"           "$FABLE_21" "bloom" "$SCOPED_JSON" "Fable 🌸"
+assert_scoped contains     "c10-scoped-bloom-used-pct"  "$FABLE_21" "bloom" "$SCOPED_JSON" "21%"
+assert_scoped not_contains "c10-scoped-no-cache"        ""          "rpg"   "$SCOPED_JSON" $'\e[97mFable '
+assert_scoped not_contains "c10-scoped-expired-hidden" \
+  "[{\"label\":\"Fable\",\"percent\":21,\"resets_at\":$SCOPED_PAST}]" "rpg" "$SCOPED_JSON" $'\e[97mFable '
+assert_scoped contains     "c10-scoped-cooldown-rpg" \
+  "[{\"label\":\"Fable\",\"percent\":100,\"resets_at\":$SCOPED_FUTURE}]" "rpg" "$SCOPED_JSON" "⏳4d1h"
+assert_scoped contains     "c10-scoped-cooldown-bloom" \
+  "[{\"label\":\"Fable\",\"percent\":100,\"resets_at\":$SCOPED_FUTURE}]" "bloom" "$SCOPED_JSON" "💤4d1h"
+assert_scoped contains     "c10-scoped-two-rows" \
+  "[{\"label\":\"Fable\",\"percent\":21,\"resets_at\":$SCOPED_FUTURE},{\"label\":\"Opus\",\"percent\":5,\"resets_at\":$SCOPED_FUTURE}]" \
+  "rpg" "$SCOPED_JSON" $'\e[97mOpus '
+assert_scoped not_contains "c10-scoped-bad-json-ignored" "not json" "rpg" "$SCOPED_JSON" $'\e[97mFable '
+# Order: the scoped bar comes after the 7d bar
+SCOPED_OUT=$(run_with_scoped "$FABLE_21" "rpg" "$SCOPED_JSON")
+if printf '%s\n' "$SCOPED_OUT" | grep -qE '7d .*Fable '; then
+  PASS=$((PASS + 1)); echo "PASS: c10-scoped-after-7d"
+else
+  FAIL=$((FAIL + 1)); FAILED_NAMES+=("c10-scoped-after-7d"); echo "FAIL: c10-scoped-after-7d"; echo "  Output: $SCOPED_OUT"
+fi
+
+# --- hooks/fetch-usage.sh ---
+# Fake curl + fake credentials; the hook must write only label/percent/resets_at,
+# never the token, and must skip the network when the cache is fresh.
+FETCH_HOOK="$SCRIPT_DIR/hooks/fetch-usage.sh"
+USAGE_FIXTURE='{"five_hour":{"utilization":4.0},"seven_day":{"utilization":12.0},
+ "limits":[
+  {"kind":"session","group":"session","percent":4,"resets_at":"2026-09-07T10:40:00.252623+00:00","scope":null},
+  {"kind":"weekly_all","group":"weekly","percent":12,"resets_at":"2026-09-11T13:00:00.252642+00:00","scope":null},
+  {"kind":"weekly_scoped","group":"weekly","percent":21,"resets_at":"2026-09-11T13:00:00.252851+00:00",
+   "scope":{"model":{"id":null,"display_name":"Fable"},"surface":null}}
+ ]}'
+
+# run_fetch_hook <have_creds 0/1> <curl_exit> <prefill_cache_json or "">
+# Sets FH_STATUS, FH_CACHE (file content or "<none>"), FH_CURL_CALLED (0/1)
+run_fetch_hook() {
+  local have_creds=$1 curl_exit=$2 prefill=$3
+  local tmp
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fetchusage.XXXXXX") || return 1
+  mkdir -p "$tmp/bin" "$tmp/home/.claude/cache"
+  cat > "$tmp/bin/curl" <<'FAKE'
+#!/bin/bash
+touch "$FAKE_CURL_MARKER"
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o|-H|--max-time) [ "$1" = -o ] && out="$2"; shift 2 ;;
+    -*) shift ;;
+    *)  shift ;;
+  esac
+done
+[ "$FAKE_CURL_EXIT" = 0 ] || exit "$FAKE_CURL_EXIT"
+if [ -n "$out" ]; then printf '%s\n' "$FAKE_USAGE_JSON" > "$out"; else printf '%s\n' "$FAKE_USAGE_JSON"; fi
+FAKE
+  chmod +x "$tmp/bin/curl"
+  [ "$have_creds" = 1 ] && printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-FAKETOKENXYZ","subscriptionType":"max"}}\n' > "$tmp/home/.claude/.credentials.json"
+  [ -n "$prefill" ] && printf '%s\n' "$prefill" > "$tmp/home/.claude/cache/usage-limits.json"
+  HOME="$tmp/home" PATH="$tmp/bin:$PATH" FAKE_CURL_MARKER="$tmp/curl.called" \
+    FAKE_CURL_EXIT="$curl_exit" FAKE_USAGE_JSON="$USAGE_FIXTURE" bash "$FETCH_HOOK" >/dev/null 2>&1
+  FH_STATUS=$?
+  # the fetch is detached; give it a moment
+  local i; for i in 1 2 3 4 5 6 7 8 9 10; do
+    [ -f "$tmp/curl.called" ] || [ "$have_creds" = 0 ] && break; sleep 0.2
+  done
+  sleep 0.3
+  FH_CURL_CALLED=0; [ -f "$tmp/curl.called" ] && FH_CURL_CALLED=1
+  FH_CACHE="<none>"; [ -f "$tmp/home/.claude/cache/usage-limits.json" ] && FH_CACHE=$(cat "$tmp/home/.claude/cache/usage-limits.json")
+  rm -rf "$tmp"
+}
+
+fh_check() {  # <name> <condition-exit-code>
+  if [ "$2" = 0 ]; then PASS=$((PASS + 1)); echo "PASS: $1"
+  else FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1"); echo "FAIL: $1"; echo "  status=$FH_STATUS curl_called=$FH_CURL_CALLED cache=$FH_CACHE"; fi
+}
+
+run_fetch_hook 1 0 ""
+fh_check "c10-hook-exit-zero" "$([ "$FH_STATUS" = 0 ]; echo $?)"
+fh_check "c10-hook-writes-scoped-row" "$(printf '%s' "$FH_CACHE" | python3 -c '
+import json,sys
+rows=json.load(sys.stdin)
+ok = rows==[{"label":"Fable","percent":21,"resets_at":1789131600}]
+sys.exit(0 if ok else 1)' 2>/dev/null; echo $?)"
+fh_check "c10-hook-never-writes-token" "$(printf '%s' "$FH_CACHE" | grep -q FAKETOKEN; [ $? = 1 ]; echo $?)"
+
+run_fetch_hook 0 0 ""
+fh_check "c10-hook-no-creds-skips" "$([ "$FH_STATUS" = 0 ] && [ "$FH_CURL_CALLED" = 0 ] && [ "$FH_CACHE" = "<none>" ]; echo $?)"
+
+run_fetch_hook 1 0 '[{"label":"Stale","percent":1,"resets_at":1}]'
+fh_check "c10-hook-fresh-cache-skips-network" "$([ "$FH_CURL_CALLED" = 0 ] && printf '%s' "$FH_CACHE" | grep -q Stale; echo $?)"
+
+# make the prefilled cache old enough (mtime 2 minutes ago) so the hook refetches
+run_fetch_hook_old() {
+  local curl_exit=$1
+  local tmp
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fetchusage.XXXXXX") || return 1
+  mkdir -p "$tmp/bin" "$tmp/home/.claude/cache"
+  printf '#!/bin/bash\ntouch "$FAKE_CURL_MARKER"; exit %s\n' "$curl_exit" > "$tmp/bin/curl"; chmod +x "$tmp/bin/curl"
+  printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-FAKETOKENXYZ"}}\n' > "$tmp/home/.claude/.credentials.json"
+  printf '[{"label":"Old","percent":9,"resets_at":1}]\n' > "$tmp/home/.claude/cache/usage-limits.json"
+  touch -d "2 minutes ago" "$tmp/home/.claude/cache/usage-limits.json"
+  HOME="$tmp/home" PATH="$tmp/bin:$PATH" FAKE_CURL_MARKER="$tmp/curl.called" bash "$FETCH_HOOK" >/dev/null 2>&1
+  FH_STATUS=$?
+  local i; for i in 1 2 3 4 5 6 7 8 9 10; do [ -f "$tmp/curl.called" ] && break; sleep 0.2; done
+  sleep 0.3
+  FH_CURL_CALLED=0; [ -f "$tmp/curl.called" ] && FH_CURL_CALLED=1
+  FH_CACHE=$(cat "$tmp/home/.claude/cache/usage-limits.json" 2>/dev/null || echo "<none>")
+  rm -rf "$tmp"
+}
+run_fetch_hook_old 22
+fh_check "c10-hook-curl-failure-keeps-old-cache" "$([ "$FH_CURL_CALLED" = 1 ] && printf '%s' "$FH_CACHE" | grep -q Old; echo $?)"
 
 # === Version consistency ===
 # VERSION file and STATUSLINE_HP_VERSION in the script must stay in sync. Checks

@@ -5,6 +5,12 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-09-07
+
+- **Model-scoped weekly limits** (the Fable weekly cap, and any future per-model cap): a new companion hook `hooks/fetch-usage.sh` (wire it to `Stop` + `SessionStart`) background-fetches the same OAuth usage endpoint `/usage` reads and caches only `label` / `percent` / `resets_at` per `weekly_scoped` row in `~/.claude/cache/usage-limits.json` — the token never touches disk outside `.credentials.json`. The statusline renders one extra health bar per row after `7d`, same colours and cooldown icon, labelled with the API `display_name` (`❤ Fable [███░░] 79% ↻4d1h`). Rows whose `resets_at` has passed are hidden; a missing or malformed cache renders nothing. The statusline payload itself only carries the 5h / 7d windows, hence the hook
+- Hook never blocks: detached subshell, 5 s curl cap, skips when the cache is under a minute old, no-ops without `~/.claude/.credentials.json` (API-key users), keeps the previous cache on fetch failure
+- Tests: +20 cases (render in both themes, expired/absent/malformed cache, cooldown, ordering after 7d, two rows; hook run against a fake `curl` + fake credentials: row extraction with ISO→epoch, token never written, no-creds skip, fresh-cache skips network, failure keeps old cache) (204 → 222)
+
 ## [0.8.0] — 2026-08-06
 
 - Subagent rows now show the per-task model as a short name (`·haiku`, `·sonnet`, `·opus`, `·fable`); unknown model ids fall back to the value lower-cased and truncated to 12 characters, and the segment is omitted when the field is absent or `inherit`
