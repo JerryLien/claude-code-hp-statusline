@@ -5,6 +5,13 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-10-04
+
+- `hooks/fetch-usage.sh` now throttles by attempt instead of by successful write: at most one request a minute, and none for 5 minutes after a failure. Before, a failed fetch (429, rejected login, network) left the cache stale, so every `Stop` in every open session re-hit the endpoint. The endpoint rate-limits logins (Claude Code 2.1.284 added its own backoff for it) and Claude Code's `/usage` reads the same endpoint, so hammering it could blank `/usage` too. The next allowed attempt is kept as an epoch in `~/.claude/cache/usage-limits.next`; a missing or unreadable stamp counts as expired
+- GitLab merge requests (`pr.kind: "mr"`, documented since Claude Code 2.1.234) render as `!N` instead of `#N`, matching GitLab numbering and Claude Code's own `MR !N` footer badge; GitHub PRs and code-review sessions are unchanged
+- README: field compatibility notes re-checked against the current statusline docs and Claude Code 2.1.289 — `fast_mode` and `pr.kind` are now documented, only the `pr.kind: "cr"` value is not
+- Tests: +11 cases (MR badge in both themes, approved glyph, no `#`; hook: failure not retried on the next Stop, failure backoff of minutes, success arms the one-minute throttle, future stamp skips the network, expired or garbage stamp refetches) (222 → 233)
+
 ## [0.9.0] — 2026-09-07
 
 - **Model-scoped weekly limits** (the Fable weekly cap, and any future per-model cap): a new companion hook `hooks/fetch-usage.sh` (wire it to `Stop` + `SessionStart`) background-fetches the same OAuth usage endpoint `/usage` reads and caches only `label` / `percent` / `resets_at` per `weekly_scoped` row in `~/.claude/cache/usage-limits.json` — the token never touches disk outside `.credentials.json`. The statusline renders one extra health bar per row after `7d`, same colours and cooldown icon, labelled with the API `display_name` (`❤ Fable [███░░] 79% ↻4d1h`). Rows whose `resets_at` has passed are hidden; a missing or malformed cache renders nothing. The statusline payload itself only carries the 5h / 7d windows, hence the hook

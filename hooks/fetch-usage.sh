@@ -7,17 +7,25 @@
 # fills the gap. Designed to never block Claude Code:
 #   - Runs entirely in a detached subshell
 #   - Caps the fetch at 5 seconds
-#   - Skips if the cache was refreshed within the last minute
+#   - At most one attempt per minute, and none for 5 minutes after a failure
 #   - Always exits 0
+#
+# The endpoint rate-limits logins and Claude Code's own /usage reads it too,
+# so the throttle counts attempts, not successful writes: a failed fetch leaves
+# the cache stale, and a cache-age check alone would retry on every Stop.
 #
 # Cache format (~/.claude/cache/usage-limits.json), token-free:
 #   [{"label":"Fable","percent":21,"resets_at":1757595600}]
+# Throttle stamp (~/.claude/cache/usage-limits.next): epoch of the next allowed attempt.
 
 set -u
 
 CACHE="${HOME}/.claude/cache/usage-limits.json"
+NEXT="${HOME}/.claude/cache/usage-limits.next"
 CREDS="${HOME}/.claude/.credentials.json"
 URL="https://api.anthropic.com/api/oauth/usage"
+THROTTLE_SECS=60
+BACKOFF_SECS=300
 
 # API-key users have no OAuth credentials -> nothing to fetch.
 [ -f "$CREDS" ] || exit 0
@@ -30,7 +38,17 @@ if [ -f "$CACHE" ] && [ -n "$(find "$CACHE" -mmin -1 2>/dev/null)" ]; then
   exit 0
 fi
 
+# Skip until the next allowed attempt; an unreadable stamp counts as expired.
+now=$(date +%s)
+next=$(head -c 20 "$NEXT" 2>/dev/null | tr -d '[:space:]')
+case "$next" in ''|*[!0-9]*) next=0 ;; esac
+[ "$now" -lt "$next" ] && exit 0
+# Arm the throttle before the fetch starts, so concurrent Stops see it.
+printf '%s\n' "$((now + THROTTLE_SECS))" > "$NEXT" 2>/dev/null
+
 (
+  backoff() { printf '%s\n' "$(( $(date +%s) + BACKOFF_SECS ))" > "$NEXT" 2>/dev/null; }
+
   TOKEN=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["claudeAiOauth"]["accessToken"])' "$CREDS" 2>/dev/null)
   [ -n "$TOKEN" ] || exit 0
 
@@ -73,7 +91,11 @@ with open(out, "w") as f:
 PY
     then
       mv -f "$TMP" "$CACHE"
+    else
+      backoff
     fi
+  else
+    backoff
   fi
   rm -f "$RAW" "$TMP" "$HDR"
 ) >/dev/null 2>&1 &
