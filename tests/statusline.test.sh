@@ -385,6 +385,25 @@ assert_contains "c7-pr-kind-other-keeps-theme-icon" "bloom" \
   '{"model":{"display_name":"Opus"},"pr":{"number":42,"kind":"pr"}}' \
   "🌷#42"
 
+# C11 pr.kind "mr" (documented, Claude Code 2.1.234+): a GitLab merge request.
+# GitLab numbers MRs as !N, and Claude Code's own footer badge reads "MR !N",
+# so the badge swaps the # prefix for ! and keeps the theme icon.
+assert_contains "c11-pr-kind-mr-bang-rpg" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":42,"kind":"mr"}}' \
+  "🔀!42"
+
+assert_contains "c11-pr-kind-mr-bang-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":42,"kind":"mr"}}' \
+  "🌷!42"
+
+assert_not_contains "c11-pr-kind-mr-no-hash" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":42,"kind":"mr"}}' \
+  "#42"
+
+assert_contains "c11-pr-kind-mr-approved-glyph" "rpg" \
+  '{"model":{"display_name":"Opus"},"pr":{"number":42,"kind":"mr","review_state":"approved"}}' \
+  "🔀!42✓"
+
 # C7 workspace.repo — owner+name upgrade the dir badge to owner/name
 assert_contains "c7-repo-badge" "rpg" \
   '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/checkout","repo":{"host":"github.com","owner":"jerry","name":"my-project"}}}' \
@@ -1242,6 +1261,84 @@ run_fetch_hook_old() {
 }
 run_fetch_hook_old 22
 fh_check "c10-hook-curl-failure-keeps-old-cache" "$([ "$FH_CURL_CALLED" = 1 ] && printf '%s' "$FH_CACHE" | grep -q Old; echo $?)"
+
+# --- fetch-usage.sh throttle + failure backoff (C11) ---
+# The usage endpoint rate-limits logins (Claude Code 2.1.284 added its own
+# backoff), and Claude Code's /usage reads the same endpoint. The hook must
+# throttle by attempt, not by successful write: ~/.claude/cache/usage-limits.next
+# holds the epoch of the next allowed attempt (1 min after any attempt, 5 min
+# after a failure).
+# fh_env <curl_exit> <stamp content or "">: creds + 2-minute-old cache in $FH_TMP
+fh_env() {
+  local curl_exit=$1 stamp=$2
+  FH_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fetchusage.XXXXXX") || return 1
+  mkdir -p "$FH_TMP/bin" "$FH_TMP/home/.claude/cache"
+  cat > "$FH_TMP/bin/curl" <<'FAKE'
+#!/bin/bash
+touch "$FAKE_CURL_MARKER"
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o|-H|--max-time) [ "$1" = -o ] && out="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+[ "$FAKE_CURL_EXIT" = 0 ] || exit "$FAKE_CURL_EXIT"
+[ -n "$out" ] && printf '%s\n' "$FAKE_USAGE_JSON" > "$out"
+exit 0
+FAKE
+  chmod +x "$FH_TMP/bin/curl"
+  FH_CURL_EXIT=$curl_exit
+  printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-FAKETOKENXYZ"}}\n' > "$FH_TMP/home/.claude/.credentials.json"
+  printf '[{"label":"Old","percent":9,"resets_at":1}]\n' > "$FH_TMP/home/.claude/cache/usage-limits.json"
+  touch -d "2 minutes ago" "$FH_TMP/home/.claude/cache/usage-limits.json"
+  [ -n "$stamp" ] && printf '%s\n' "$stamp" > "$FH_TMP/home/.claude/cache/usage-limits.next"
+  return 0
+}
+# fh_invoke: run the hook once in $FH_TMP and wait for the detached fetch.
+# Sets FH_CURL_CALLED (0/1) and FH_NEXT (stamp content or "<none>").
+fh_invoke() {
+  rm -f "$FH_TMP/curl.called"
+  HOME="$FH_TMP/home" PATH="$FH_TMP/bin:$PATH" FAKE_CURL_MARKER="$FH_TMP/curl.called" \
+    FAKE_CURL_EXIT="$FH_CURL_EXIT" FAKE_USAGE_JSON="$USAGE_FIXTURE" bash "$FETCH_HOOK" >/dev/null 2>&1
+  FH_STATUS=$?
+  local i; for i in 1 2 3 4 5 6 7 8 9 10; do [ -f "$FH_TMP/curl.called" ] && break; sleep 0.2; done
+  sleep 0.4
+  FH_CURL_CALLED=0; [ -f "$FH_TMP/curl.called" ] && FH_CURL_CALLED=1
+  FH_NEXT=$(cat "$FH_TMP/home/.claude/cache/usage-limits.next" 2>/dev/null || echo "<none>")
+  FH_CACHE=$(cat "$FH_TMP/home/.claude/cache/usage-limits.json" 2>/dev/null || echo "<none>")
+}
+
+# A failed fetch must not be retried on the very next Stop (the bug: the cache
+# stayed stale, so every Stop in every session re-hit the endpoint).
+fh_env 22 ""
+fh_invoke; FH_FIRST_CALLED=$FH_CURL_CALLED; FH_FAIL_NEXT=$FH_NEXT; FH_NOW=$(date +%s)
+fh_invoke
+fh_check "c11-hook-failure-not-retried-next-stop" "$([ "$FH_FIRST_CALLED" = 1 ] && [ "$FH_CURL_CALLED" = 0 ]; echo $?)"
+fh_check "c11-hook-failure-backs-off-minutes" "$(case "$FH_FAIL_NEXT" in ''|*[!0-9]*) echo 1 ;; *) [ "$FH_FAIL_NEXT" -ge $((FH_NOW + 200)) ]; echo $? ;; esac)"
+rm -rf "$FH_TMP"
+
+# A successful fetch arms the normal one-minute throttle, not the long backoff.
+fh_env 0 ""
+fh_invoke; FH_NOW=$(date +%s)
+fh_check "c11-hook-success-throttles-one-minute" "$(case "$FH_NEXT" in ''|*[!0-9]*) echo 1 ;; *) [ "$FH_CURL_CALLED" = 1 ] && [ "$FH_NEXT" -gt "$FH_NOW" ] && [ "$FH_NEXT" -le $((FH_NOW + 90)) ]; echo $? ;; esac)"
+fh_check "c11-hook-success-writes-cache" "$(printf '%s' "$FH_CACHE" | grep -q Fable; echo $?)"
+rm -rf "$FH_TMP"
+
+fh_env 0 "$(( $(date +%s) + 120 ))"
+fh_invoke
+fh_check "c11-hook-future-stamp-skips-network" "$([ "$FH_CURL_CALLED" = 0 ]; echo $?)"
+rm -rf "$FH_TMP"
+
+fh_env 0 "$(( $(date +%s) - 10 ))"
+fh_invoke
+fh_check "c11-hook-expired-stamp-refetches" "$([ "$FH_CURL_CALLED" = 1 ]; echo $?)"
+rm -rf "$FH_TMP"
+
+fh_env 0 "garbage"
+fh_invoke
+fh_check "c11-hook-garbage-stamp-refetches" "$([ "$FH_CURL_CALLED" = 1 ] && [ "$FH_STATUS" = 0 ]; echo $?)"
+rm -rf "$FH_TMP"
 
 # === Version consistency ===
 # VERSION file and STATUSLINE_HP_VERSION in the script must stay in sync. Checks

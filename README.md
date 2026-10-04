@@ -71,7 +71,7 @@ Only appear when the relevant data is present:
 - **⌨N / ⌨I** — Current vim mode (NORMAL / INSERT), when vim mode is enabled
 - **·agent** — Agent name when launched via `--agent`
 - **⏩fast / 🐝 fast — Fast mode** — Appears right after the effort level when Opus fast mode is enabled (`/fast`, the `fast_mode` field). RPG renders `⏩fast` in bold bright-green; Bloom renders `🐝 fast` flat. Hidden when fast mode is off — and naturally absent on models that don't report it (Claude Code only sends it truthy for Opus)
-- **🔀#1234✓ / 🌷#1234✓ PR badge** — Open PR for the current branch (`pr.number`), placed right after the worktree block. Glyph + colour encode `pr.review_state`: `✓` approved (green), `…` pending (yellow), `✗` changes_requested (red), `✎` draft (grey); neutral cyan with no glyph when the review state is absent or unrecognised. When `pr.url` is set the badge is a clickable OSC 8 hyperlink (and the hidden URL is excluded from the responsive width calculation). Remote code-review sessions (`pr.kind: "cr"`) swap the icon to `🔍` in both themes
+- **🔀#1234✓ / 🌷#1234✓ PR badge** — Open PR for the current branch (`pr.number`), placed right after the worktree block. Glyph + colour encode `pr.review_state`: `✓` approved (green), `…` pending (yellow), `✗` changes_requested (red), `✎` draft (grey); neutral cyan with no glyph when the review state is absent or unrecognised. When `pr.url` is set the badge is a clickable OSC 8 hyperlink (and the hidden URL is excluded from the responsive width calculation). Remote code-review sessions (`pr.kind: "cr"`) swap the icon to `🔍` in both themes. GitLab merge requests (`pr.kind: "mr"`, Claude Code 2.1.234+, needs an authenticated `glab`) render as `🔀!42`, matching GitLab numbering
 - **📁 owner/repo** — When Claude Code reports the repository identity (`workspace.repo.owner` + `.name`), the directory badge shows `owner/name` instead of the checkout directory basename
 
 ## Subagent status line
@@ -111,15 +111,15 @@ Since 0.8.0 each row also carries three per-task details:
 
 ## Field compatibility notes
 
-Two fields this script consumes are emitted by Claude Code but missing from the
-official statusline schema docs (verified by inspecting v2.1.201; they may
-change without notice in future releases):
+Every field this script consumes is in the official statusline schema docs
+(checked against the docs and Claude Code v2.1.289), with one exception:
 
-- **`fast_mode`** — drives the `⏩fast` / `🐝 fast` badge
-- **`pr.kind`** — drives the `🔍` code-review PR icon
+- **`pr.kind: "cr"`** — drives the `🔍` code-review PR icon. The docs only list
+  `"mr"` (GitLab merge request); `"cr"` was seen by inspecting v2.1.201 and may
+  change without notice
 
-If either badge silently disappears after a Claude Code upgrade, these fields
-are the first thing to re-verify.
+If the `🔍` icon silently disappears after a Claude Code upgrade, this value is
+the first thing to re-verify.
 
 A third thing worth tracking is a payload-shape divergence rather than a
 missing field (verified against Claude Code 2.1.223):
@@ -265,8 +265,10 @@ chmod +x ~/.claude/hooks/fetch-usage.sh
 The hook reads the OAuth token from `~/.claude/.credentials.json`, sends it only
 to `api.anthropic.com`, and writes a token-free cache
 (`~/.claude/cache/usage-limits.json`: `label`, `percent`, `resets_at`). It runs
-detached, caps the request at 5 seconds, skips when the cache is under a minute
-old, and silently no-ops for API-key users or when the network is down — the bar
+detached, caps the request at 5 seconds, makes at most one request a minute and
+none for 5 minutes after a failed one (the endpoint rate-limits logins, and
+Claude Code's own `/usage` reads it too), and silently no-ops for API-key users
+or when the network is down — the bar
 simply stays hidden. The percentage updates when a turn ends; the reset countdown
 is live. Any future per-model cap Anthropic adds shows up as another bar with no
 script change.

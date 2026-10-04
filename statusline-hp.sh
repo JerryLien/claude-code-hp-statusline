@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.9.0"
+STATUSLINE_HP_VERSION="0.9.1"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -290,7 +290,8 @@ added_count = len(added_dirs) if isinstance(added_dirs, list) else 0
 pr_number = g(d, "pr", "number")
 pr_url = g(d, "pr", "url") or ""
 pr_review = (g(d, "pr", "review_state") or "").lower()
-# pr.kind is undocumented but emitted (verified 2.1.201); "cr" = remote code review
+# pr.kind: "mr" = GitLab merge request (documented, 2.1.234+); "cr" = remote
+# code-review session (undocumented, seen in 2.1.201); absent for GitHub PRs
 pr_kind = (g(d, "pr", "kind") or "").lower()
 def pos_int(v):
     try:
@@ -634,6 +635,8 @@ fi
 if [ "${PR_NUMBER:-0}" -gt 0 ] 2>/dev/null; then
   # Remote code-review sessions get a magnifier regardless of theme
   [ "$PR_KIND" = "cr" ] && PR_ICON="🔍"
+  # GitLab numbers merge requests !N (Claude Code footer: "MR !N")
+  pr_prefix="#"; [ "$PR_KIND" = "mr" ] && pr_prefix="!"
   case "$PR_REVIEW" in
     approved)          pr_glyph="✓"; pr_color="$BRIGHT_GREEN" ;;
     pending)           pr_glyph="…"; pr_color="$BRIGHT_YELLOW" ;;
@@ -641,7 +644,7 @@ if [ "${PR_NUMBER:-0}" -gt 0 ] 2>/dev/null; then
     draft)             pr_glyph="✎"; pr_color="$GRAY" ;;
     *)                 pr_glyph="";  pr_color="$CYAN" ;;
   esac
-  pr_text="${PR_ICON}#${PR_NUMBER}${pr_glyph}"
+  pr_text="${PR_ICON}${pr_prefix}${PR_NUMBER}${pr_glyph}"
   if [ -n "$PR_URL" ]; then
     # OSC 8 hyperlink: ESC ] 8 ;; URL ST  <visible>  ESC ] 8 ;; ST   (ST = ESC backslash)
     # ST is written \033\\\\ (not \033\\): in this double-quoted string that yields
