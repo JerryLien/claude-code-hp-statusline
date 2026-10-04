@@ -5,6 +5,13 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-10-04
+
+- **Prompt cache expiry** (`prompt_cache`, Claude Code 2.1.251+): while the cache is warm the `⚡` hit ratio gains its time to expiry in grey (`⚡92% 3m`, `<1m` in the last minute); once it is cold the ratio is replaced by a grey `⚡cold`, since the next request writes the whole context to the cache again. A `warm` flag whose `expires_at` has already passed counts as cold. Without `prompt_cache`, or while `caching_observed` is false, the ratio renders exactly as before. Claude Code re-runs the statusline when the cache expires; `refreshInterval` keeps the countdown moving while idle
+- **Thinking badge inverted**: `💭` no longer shows while thinking is on; a grey `💭off` shows when it is explicitly off. Claude Code reports `thinking.enabled: true` for every model that cannot turn thinking off (Fable 5.1, Opus 5.5; verified in the 2.1.289 payload builder), so the old badge was permanently lit on those models. An absent field still renders nothing
+- README samples and badge descriptions updated
+- Tests: +14 cases (warm countdown in both themes, under a minute, cold shown and grey and hiding the ratio, expired-warm is cold, unobserved and absent keep the ratio without a countdown; thinking on hidden in both themes, off shown in both themes and grey; first double-digit minor version: an installed 0.10+ script shows no update badge for 0.9.99) (244 → 258)
+
 ## [0.9.2] — 2026-10-04
 
 - `/statusline-update` now also refreshes the companion files you already installed: the update-check hook, the usage hook, the `/statustheme` skill, and the command itself. It never installs a file you skipped. Each download must pass `bash -n` (hooks) or start with `---` frontmatter (skill, command) and is compared before replacing, so an unchanged file reports `unchanged`; a companion that fails to download or validate is reported and left alone without failing the update. Companions are refreshed even when the script is already current (an older command may have updated the script without them), and are left untouched when the downgrade guard aborts. Before this, hook fixes such as 0.9.1's backoff never reached installed users

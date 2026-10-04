@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.9.2"
+STATUSLINE_HP_VERSION="0.10.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -325,9 +325,28 @@ it = cu.get("input_tokens") or 0
 _cache_total = cr + cc + it
 cache_pct = int(cr * 100 / _cache_total) if _cache_total > 0 else -1
 
+# prompt_cache (2.1.251+): warm cache -> time to expiry after the ratio,
+# cold cache -> grey cold marker. Only once any cache tokens were seen.
+cache_state = ""
+cache_ttl = ""
+pc = d.get("prompt_cache")
+if isinstance(pc, dict) and pc.get("caching_observed") is True:
+    exp = pc.get("expires_at")
+    has_exp = isinstance(exp, (int, float)) and not isinstance(exp, bool)
+    if pc.get("warm") is True and not (has_exp and exp <= time.time()):
+        cache_state = "warm"
+        if has_exp:
+            cache_ttl = fmt_remaining(exp)
+            if cache_ttl == "0m":
+                cache_ttl = "<1m"
+    else:
+        cache_state = "cold"
+
 ctx_size = g(d, "context_window", "context_window_size") or 0
 is_1m_ctx = 1 if ctx_size >= 1_000_000 else 0
-thinking_on = 1 if g(d, "thinking", "enabled") else 0
+# Only an explicit off is shown: Claude Code reports enabled=true whenever
+# the model cannot turn thinking off (Fable 5.1, Opus 5.5), so on says nothing.
+thinking_off = 1 if g(d, "thinking", "enabled") is False else 0
 
 # Live effort from spec (reflects mid-session /effort changes). Claude Code
 # emits effort.level only for effort-capable models, so absence means the
@@ -415,9 +434,11 @@ print(f"WALL_TIME=\"{wall_dur}\"")
 print(f"EXCEEDS_200K={exceeds_200k}")
 print(f"FAST_MODE={fast_mode}")
 print(f"CACHE_PCT={cache_pct}")
+print(f"CACHE_STATE=\"{cache_state}\"")
+print(f"CACHE_TTL=\"{sh(cache_ttl)}\"")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
 print(f"IS_1M_CTX={is_1m_ctx}")
-print(f"THINKING_ON={thinking_on}")
+print(f"THINKING_OFF={thinking_off}")
 print(f"OUTPUT_STYLE=\"{sh(output_style)}\"")
 print(f"SESSION_NAME=\"{sh(session_name)}\"")
 print(f"WORKTREE_NAME=\"{sh(wt_name)}\"")
@@ -618,7 +639,7 @@ fi
 
 parts_row1+="${BOLD}${WHITE}${MODEL_ICON} ${MODEL}${RESET}"
 [ "${IS_1M_CTX:-0}" = "1" ] && parts_row1+="${CYAN}[1M]${RESET}"
-[ "${THINKING_ON:-0}" = "1" ] && parts_row1+=" ${MAGENTA}💭${RESET}"
+[ "${THINKING_OFF:-0}" = "1" ] && parts_row1+=" ${GRAY}💭off${RESET}"
 if [ -n "$WORKSPACE_DIR" ]; then
   if [ "${ADDED_COUNT:-0}" -gt 0 ] 2>/dev/null; then
     parts_row1+=" ${CYAN}📁 ${WORKSPACE_DIR}+${ADDED_COUNT}${RESET}"
@@ -692,12 +713,16 @@ done
 # Context window
 parts_row2+="  $(ctx_bar "$CTX")"
 
-# Cache hit ratio
-if [ "${CACHE_PCT:-"-1"}" -ge 0 ] 2>/dev/null; then
+# Cache hit ratio; a warm prompt cache adds its time to expiry, a cold one
+# replaces the ratio (the next request re-caches regardless of the last ratio)
+if [ "${CACHE_STATE:-}" = "cold" ]; then
+  parts_row2+=" ${GRAY}⚡cold${RESET}"
+elif [ "${CACHE_PCT:-"-1"}" -ge 0 ] 2>/dev/null; then
   if [ "$CACHE_PCT" -ge 70 ]; then cache_color="$BRIGHT_GREEN"
   elif [ "$CACHE_PCT" -ge 30 ]; then cache_color="$BRIGHT_YELLOW"
   else cache_color="$BRIGHT_RED"; fi
   parts_row2+=" ${cache_color}⚡${CACHE_PCT}%${RESET}"
+  [ -n "${CACHE_TTL:-}" ] && parts_row2+="${GRAY} ${CACHE_TTL}${RESET}"
 fi
 
 # 200k threshold: exceeds_200k_tokens is a fixed 200k flag regardless of

@@ -3,11 +3,11 @@
 > Turn your [Claude Code](https://claude.com/claude-code) status line into a game HUD. See usage limits as health bars, catch cache-miss regressions instantly, and get a loud heads-up the moment a new release drops.
 
 ```
-⚔ Opus[1M] 💭 📁 my-project ↑high  ❤ 5h [█████████░░░░░░] 65% ↻2h29m  ❤ 7d [████░░░░░░░░░░░] 28% ↻1d4h  🧠 ▮▮▮▮▯▯▯▯▯▯ 42% ⚡87%  🔮 2m14s/45m  💰 $2.80  +87/-12  v2.1.105
+⚔ Opus[1M] 📁 my-project ↑high  ❤ 5h [█████████░░░░░░] 65% ↻2h29m  ❤ 7d [████░░░░░░░░░░░] 28% ↻1d4h  🧠 ▮▮▮▮▯▯▯▯▯▯ 42% ⚡87% 3m  🔮 2m14s/45m  💰 $2.80  +87/-12  v2.1.105
 ```
 
 ```
-🌱 Opus[1M] 💭 📁 my-project 🔴 high  5h 🌸🌸🌸🌸🌸·········· 35% ↻2h29m  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72% ↻1d4h  🍄 🌸🌸🌸🌸······ 42% ⚡87%  🌿 2m14s/45m  🌕 $2.80  +87/-12  v2.1.105
+🌱 Opus[1M] 📁 my-project 🔴 high  5h 🌸🌸🌸🌸🌸·········· 35% ↻2h29m  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72% ↻1d4h  🍄 🌸🌸🌸🌸······ 42% ⚡87% 3m  🌿 2m14s/45m  🌕 $2.80  +87/-12  v2.1.105
 ```
 
 ## Why?
@@ -19,7 +19,7 @@ The default status line tells you very little. This one turns everything that ma
 - ❤ **Health-bar rate limits** — 5-hour and 7-day windows with countdown to reset
 - ❤ **Per-model weekly caps** — a third bar for model-scoped limits such as the Fable weekly cap (needs the optional usage hook, see below)
 - 🧠 **Context window meter** — know exactly how much headroom you have
-- ⚡ **Cache hit ratio** — realtime feedback that your prompt caching is actually working
+- ⚡ **Cache hit ratio** — realtime feedback that your prompt caching is actually working, plus how long a warm cache has left and a grey `⚡cold` once it expires
 - ⚠ **200k threshold alert** — loud warning the moment per-token pricing jumps
 - 🔮 **Total casting time** — how long you've been waiting on Claude this session
 - 💰 **Session cost** — equivalent API cost, even on Pro/Max subscriptions
@@ -27,7 +27,7 @@ The default status line tells you very little. This one turns everything that ma
 - 🆕 **Update alert** — version number flips to a yellow badge the instant a newer release hits your local changelog cache
 - 📁 **Workspace + worktree** — Current dir basename and `--worktree` name always visible
 - 🔀 **PR badge** — Open PR for the current branch with review-state glyph + colour, click-to-open via OSC 8 link
-- 💭 / **[1M]** **Model state indicators** — Shows when extended thinking is on or when running with a 1M-token context window
+- 💭 / **[1M]** **Model state indicators** — Shows `💭off` when extended thinking is turned off, and `[1M]` when running with a 1M-token context window
 - ⏩ / 🐝 **Fast mode** — Badge appears next to the effort level when Opus fast mode (`/fast`) is on
 - 🎨 **Two themes** — classic RPG (`⚔❤█░`) or peaceful Bloom garden (`🌱🌸🍄🌕`)
 - 📏 **Responsive layout** — auto-wraps into 2 rows (identity / metrics) when the terminal is too narrow, stays single-line on wide screens
@@ -38,7 +38,7 @@ The default status line tells you very little. This one turns everything that ma
 
 - **Model + Effort** — Current model and effort level (low / medium / high / xhigh / max). RPG: ↓low / ~medium / ↑high / ⇈xhigh / ★max · Bloom: 🔵 low / 🟡 medium / 🔴 high / 🟣 xhigh / ⚫ max. Reads the live `effort.level` from Claude Code, so mid-session `/effort` changes show up immediately
 - **[1M] badge** — Cyan `[1M]` next to the model name when the session is running with a 1M-token context window (`context_window.context_window_size >= 1000000`). Hidden for the 200k default
-- **💭 Thinking** — Magenta thought-bubble next to the model name when extended thinking is enabled for the session
+- **💭off Thinking off** — Grey `💭off` next to the model name when extended thinking is turned off. Nothing is shown while it is on: Claude Code reports thinking as on for every model that cannot turn it off (Fable 5.1, Opus 5.5), so an "on" badge would never go out
 - **Output style** — Current output style name when set to a non-default value (📖 RPG · 🌻 Bloom)
 - **Session name** — `#<name>` when the session was named via `--name` or `/rename`, helpful for juggling multiple sessions
 - **Worktree** — `🌳<name>` when working inside a linked git worktree (prefers `worktree.name` from `--worktree` sessions, falls back to `workspace.git_worktree`). Appends `⎇<branch>` in dim gray when the worktree's git branch is known
@@ -57,7 +57,7 @@ The default status line tells you very little. This one turns everything that ma
 
 ### Smart alerts
 
-- **⚡ Cache hit ratio** — Green ≥70%, yellow ≥30%, red <30%. A great real-time check that prompt caching is actually working
+- **⚡ Cache hit ratio** — Green ≥70%, yellow ≥30%, red <30%. A great real-time check that prompt caching is actually working. With Claude Code 2.1.251+ (`prompt_cache`), a warm cache adds its time to expiry in grey (`⚡87% 3m`, `<1m` in the last minute), and once it has gone cold the ratio is replaced by a grey `⚡cold`: the next request writes the whole context to the cache again. Claude Code re-runs the statusline the moment the cache expires; set `refreshInterval` so the countdown keeps moving while idle
 - **⚠ 200k** — Red warning badge when the session crosses the 200k-token threshold (where per-token pricing jumps)
 - **🔮 / 🌿 Casting time + wall time** — Total time spent waiting on Claude API responses, followed by total session wall time (e.g. `🔮 2m14s/45m`). RPG: 🔮 crystal ball · Bloom: 🌿 growing plant
 - **v2.1.100→2.1.105** — Version badge goes yellow-highlighted with the target version when a newer release is detected in Claude Code's local changelog cache
