@@ -417,22 +417,74 @@ assert_contains "c7-repo-partial-falls-back" "rpg" \
   '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/user/checkout","repo":{"owner":"jerry"}}}' \
   "📁 checkout"
 
-# C2 thinking.enabled
-assert_contains "c2-thinking-on-rpg" "rpg" \
+# C2 thinking.enabled — only an explicit "off" is shown. Claude Code reports
+# enabled=true whenever the model cannot turn thinking off (Fable 5.1, Opus 5.5;
+# verified in the 2.1.289 payload builder), so "on" carries no information.
+assert_not_contains "c2-thinking-on-hidden-rpg" "rpg" \
   '{"model":{"display_name":"Opus"},"thinking":{"enabled":true}}' \
   "💭"
 
-assert_contains "c2-thinking-on-bloom" "bloom" \
+assert_not_contains "c2-thinking-on-hidden-bloom" "bloom" \
   '{"model":{"display_name":"Opus"},"thinking":{"enabled":true}}' \
   "💭"
 
-assert_not_contains "c2-thinking-off" "rpg" \
+assert_contains "c2-thinking-off-shown-rpg" "rpg" \
   '{"model":{"display_name":"Opus"},"thinking":{"enabled":false}}' \
-  "💭"
+  "💭off"
+
+assert_contains "c2-thinking-off-shown-bloom" "bloom" \
+  '{"model":{"display_name":"Opus"},"thinking":{"enabled":false}}' \
+  "💭off"
+
+assert_contains "c2-thinking-off-is-gray" "rpg" \
+  '{"model":{"display_name":"Opus"},"thinking":{"enabled":false}}' \
+  $'\e[90m💭off'
 
 assert_not_contains "c2-thinking-absent" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "💭"
+
+# C13 prompt_cache (Claude Code 2.1.251+): a warm cache appends its time to
+# expiry after the hit ratio; a cold one replaces the ratio with a grey
+# ⚡cold. Without prompt_cache, or before any cache tokens were seen, the
+# ratio renders as before.
+# assert_plain <contains|not_contains|not_regex> <name> <theme> <json> <pattern>
+# Matches against the output with ANSI colour codes stripped.
+assert_plain() {
+  local mode=$1 name=$2 theme=$3 json=$4 pattern=$5 output ok=1
+  output=$(printf '%s\n' "$json" | STATUSLINE_THEME="$theme" "$STATUSLINE" 2>&1 | sed $'s/\e\\[[0-9;]*m//g')
+  case "$mode" in
+    contains)     printf '%s\n' "$output" | grep -qF -- "$pattern" && ok=0 ;;
+    not_contains) printf '%s\n' "$output" | grep -qF -- "$pattern" || ok=0 ;;
+    not_regex)    printf '%s\n' "$output" | grep -qE -- "$pattern" || ok=0 ;;
+  esac
+  if [ "$ok" = 0 ]; then PASS=$((PASS + 1)); echo "PASS: $name"
+  else FAIL=$((FAIL + 1)); FAILED_NAMES+=("$name"); echo "FAIL: $name"; echo "  $mode: $pattern"; echo "  Output: $output"; fi
+}
+PC_NOW=$(date +%s)
+pc_json() {  # <prompt_cache object or "">
+  local pc=""
+  [ -n "$1" ] && pc=",\"prompt_cache\":$1"
+  printf '{"model":{"display_name":"Opus"},"context_window":{"current_usage":{"input_tokens":8,"cache_creation_input_tokens":0,"cache_read_input_tokens":92}}%s}' "$pc"
+}
+PC_WARM=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 200))}")
+PC_WARM_SOON=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 30))}")
+PC_COLD=$(pc_json '{"warm":false,"caching_observed":true,"ttl":"5m","expires_at":null}')
+PC_EXPIRED=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW - 5))}")
+PC_UNOBSERVED=$(pc_json '{"warm":false,"caching_observed":false,"expires_at":null}')
+PC_ABSENT=$(pc_json "")
+
+assert_plain contains     "c13-cache-warm-countdown-rpg"    "rpg"   "$PC_WARM"       "⚡92% 3m"
+assert_plain contains     "c13-cache-warm-countdown-bloom"  "bloom" "$PC_WARM"       "⚡92% 3m"
+assert_plain contains     "c13-cache-warm-under-a-minute"   "rpg"   "$PC_WARM_SOON"  "⚡92% <1m"
+assert_plain contains     "c13-cache-cold-shown"            "rpg"   "$PC_COLD"       "⚡cold"
+assert_plain not_contains "c13-cache-cold-hides-ratio"      "rpg"   "$PC_COLD"       "⚡92%"
+assert_contains           "c13-cache-cold-is-gray"          "rpg"   "$PC_COLD"       $'\e[90m⚡cold'
+assert_plain contains     "c13-cache-expired-is-cold"       "rpg"   "$PC_EXPIRED"    "⚡cold"
+assert_plain contains     "c13-cache-unobserved-keeps-ratio" "rpg"  "$PC_UNOBSERVED" "⚡92%"
+assert_plain not_contains "c13-cache-unobserved-not-cold"   "rpg"   "$PC_UNOBSERVED" "cold"
+assert_plain contains     "c13-cache-absent-keeps-ratio"    "rpg"   "$PC_ABSENT"     "⚡92%"
+assert_plain not_regex    "c13-cache-absent-no-countdown"   "rpg"   "$PC_ABSENT"     '⚡92% [0-9<]'
 
 # C3 1M context window badge
 assert_contains "c3-1m-badge" "rpg" \
@@ -934,6 +986,12 @@ assert_sl_not_contains "c4-equal-no-badge" "0.4.0" "rpg" \
   "📦"
 
 assert_sl_not_contains "c4-older-no-badge" "0.0.1" "rpg" \
+  '{"model":{"display_name":"Opus"}}' \
+  "📦"
+
+# Versions compare numerically per segment: the installed 0.10+ script is newer
+# than 0.9.99, although "0.9.99" sorts after "0.10.0" as a string
+assert_sl_not_contains "c13-double-digit-minor-no-false-badge" "0.9.99" "rpg" \
   '{"model":{"display_name":"Opus"}}' \
   "📦"
 
