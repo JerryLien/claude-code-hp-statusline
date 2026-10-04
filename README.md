@@ -226,6 +226,15 @@ working as if the feature was off.
 **3.** When the badge appears, type `/statusline-update` and Claude will run the
 upgrade for you. The previous version is kept at `~/.claude/statusline-hp.sh.bak`.
 
+The same run refreshes the companion files you already installed: both hooks,
+the `/statustheme` skill, and the `/statusline-update` command itself. Files you
+never installed stay uninstalled, and each download must pass `bash -n` (hooks)
+or start with frontmatter (skill, command) before it replaces the old copy.
+
+> **Upgrading from 0.9.1 or earlier:** the old command only updates the script.
+> Re-run the `curl` for `commands/statusline-update.md` from step 1 once, then
+> run `/statusline-update`; later releases refresh everything on their own.
+
 ## Per-model weekly caps (optional)
 
 Claude.ai plans carry model-scoped weekly limits on top of the 5h / 7d windows —

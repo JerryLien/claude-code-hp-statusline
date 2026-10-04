@@ -5,6 +5,13 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-10-04
+
+- `/statusline-update` now also refreshes the companion files you already installed: the update-check hook, the usage hook, the `/statustheme` skill, and the command itself. It never installs a file you skipped. Each download must pass `bash -n` (hooks) or start with `---` frontmatter (skill, command) and is compared before replacing, so an unchanged file reports `unchanged`; a companion that fails to download or validate is reported and left alone without failing the update. Companions are refreshed even when the script is already current (an older command may have updated the script without them), and are left untouched when the downgrade guard aborts. Before this, hook fixes such as 0.9.1's backoff never reached installed users
+- Upgrading from 0.9.1 or earlier: re-download `commands/statusline-update.md` once (README, "Stay up to date" step 1), because the old command cannot refresh itself
+- `/statustheme` skill frontmatter: `user_invocable` → `user-invocable`, the key Claude Code actually reads. No behaviour change: the key defaults to true
+- Tests: +11 cases (companions refreshed on upgrade and on same version, hooks stay executable, missing companions never installed, downgrade abort leaves them, invalid hook / failed download / missing frontmatter keep the old copy without failing the update, skill frontmatter key) (233 → 244)
+
 ## [0.9.1] — 2026-10-04
 
 - `hooks/fetch-usage.sh` now throttles by attempt instead of by successful write: at most one request a minute, and none for 5 minutes after a failure. Before, a failed fetch (429, rejected login, network) left the cache stale, so every `Stop` in every open session re-hit the endpoint. The endpoint rate-limits logins (Claude Code 2.1.284 added its own backoff for it) and Claude Code's `/usage` reads the same endpoint, so hammering it could blank `/usage` too. The next allowed attempt is kept as an epoch in `~/.claude/cache/usage-limits.next`; a missing or unreadable stamp counts as expired
