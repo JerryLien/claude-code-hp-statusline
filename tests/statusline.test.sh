@@ -566,6 +566,111 @@ assert_update "c8-downgrade-aborts"          "0.5.0" "0.5.0"    "0.6.0"    1    
 assert_update "c8-same-version-noop"         "0.6.0" "0.6.0"    "0.6.0"    0       "0.6.0"
 assert_update "c8-script-version-mismatch"   "0.7.0" "0.6.9"    "0.6.0"    1       "0.6.0"
 
+# C12 /statusline-update also refreshes companion files the user already
+# installed (both hooks, the theme skill, the command itself) and never
+# installs new ones. Fake curl serves U_CHECK / U_FETCH / U_SKILL / U_CMD;
+# an empty variable answers like a 404.
+upd_env() {  # <remote version> <installed version>
+  UPD_TMP=$(mktemp -d "${TMPDIR:-/tmp}/slupdate.XXXXXX") || return 1
+  mkdir -p "$UPD_TMP/bin" "$UPD_TMP/home/.claude/hooks" \
+    "$UPD_TMP/home/.claude/skills/statustheme" "$UPD_TMP/home/.claude/commands"
+  cat > "$UPD_TMP/bin/curl" <<'FAKE'
+#!/bin/bash
+out=""; url=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    -*) shift ;;
+    *)  url="$1"; shift ;;
+  esac
+done
+case "$url" in
+  */VERSION)                       content="$FAKE_REMOTE_VERSION" ;;
+  */statusline-hp.sh)              content="$FAKE_REMOTE_SCRIPT" ;;
+  */hooks/check-update.sh)         content="$U_CHECK" ;;
+  */hooks/fetch-usage.sh)          content="$U_FETCH" ;;
+  */statusline-hp-SKILL.md)        content="$U_SKILL" ;;
+  */commands/statusline-update.md) content="$U_CMD" ;;
+  *) exit 22 ;;
+esac
+[ -n "$content" ] || exit 22
+if [ -n "$out" ]; then printf '%s\n' "$content" > "$out"; else printf '%s\n' "$content"; fi
+FAKE
+  chmod +x "$UPD_TMP/bin/curl"
+  UPD_REMOTE=$1
+  printf '#!/bin/bash\nSTATUSLINE_HP_VERSION="%s"\n' "$2" > "$UPD_TMP/home/.claude/statusline-hp.sh"
+  sed -n '/^```bash$/,/^```$/p' "$SCRIPT_DIR/commands/statusline-update.md" | sed '1d;$d' > "$UPD_TMP/snippet.sh"
+  U_CHECK=""; U_FETCH=""; U_SKILL=""; U_CMD=""
+}
+upd_put() { printf '%s\n' "$2" > "$UPD_TMP/home/.claude/$1"; case "$1" in *.sh) chmod 755 "$UPD_TMP/home/.claude/$1" ;; esac; }
+upd_get() { cat "$UPD_TMP/home/.claude/$1" 2>/dev/null || echo "<none>"; }
+upd_run() {
+  local body
+  printf -v body '#!/bin/bash\nSTATUSLINE_HP_VERSION="%s"\necho ok\n' "$UPD_REMOTE"
+  UPD_OUT=$(HOME="$UPD_TMP/home" PATH="$UPD_TMP/bin:$PATH" \
+    FAKE_REMOTE_VERSION="$UPD_REMOTE" FAKE_REMOTE_SCRIPT="$body" \
+    U_CHECK="$U_CHECK" U_FETCH="$U_FETCH" U_SKILL="$U_SKILL" U_CMD="$U_CMD" \
+    bash "$UPD_TMP/snippet.sh" 2>&1)
+  UPD_STATUS=$?
+}
+upd_check() {  # <name> <condition-exit-code>
+  if [ "$2" = 0 ]; then PASS=$((PASS + 1)); echo "PASS: $1"
+  else FAIL=$((FAIL + 1)); FAILED_NAMES+=("$1"); echo "FAIL: $1"; echo "  status=$UPD_STATUS output: $UPD_OUT"; fi
+}
+NEW_HOOK=$'#!/bin/bash\necho new-hook'
+NEW_SKILL=$'---\nname: statustheme\n---\nnew-skill'
+NEW_CMD=$'---\ndescription: x\n---\nnew-cmd'
+
+# Upgrade: every installed companion is refreshed; hooks stay executable
+upd_env "0.7.0" "0.6.0"
+upd_put hooks/check-statusline-update.sh "old-check"; upd_put hooks/fetch-usage.sh "old-fetch"
+upd_put skills/statustheme/SKILL.md "old-skill"; upd_put commands/statusline-update.md "old-cmd"
+U_CHECK=$NEW_HOOK; U_FETCH=$NEW_HOOK; U_SKILL=$NEW_SKILL; U_CMD=$NEW_CMD
+upd_run
+upd_check "c12-upgrade-refreshes-hooks" "$([ "$UPD_STATUS" = 0 ] && [ "$(upd_get hooks/check-statusline-update.sh)" = "$NEW_HOOK" ] && [ "$(upd_get hooks/fetch-usage.sh)" = "$NEW_HOOK" ]; echo $?)"
+upd_check "c12-hooks-stay-executable" "$([ -x "$UPD_TMP/home/.claude/hooks/check-statusline-update.sh" ] && [ -x "$UPD_TMP/home/.claude/hooks/fetch-usage.sh" ]; echo $?)"
+upd_check "c12-upgrade-refreshes-skill-and-command" "$([ "$(upd_get skills/statustheme/SKILL.md)" = "$NEW_SKILL" ] && [ "$(upd_get commands/statusline-update.md)" = "$NEW_CMD" ]; echo $?)"
+rm -rf "$UPD_TMP"
+
+# Companions the user never installed stay uninstalled
+upd_env "0.7.0" "0.6.0"
+U_CHECK=$NEW_HOOK; U_FETCH=$NEW_HOOK; U_SKILL=$NEW_SKILL; U_CMD=$NEW_CMD
+upd_run
+upd_check "c12-never-installs-missing-companions" "$([ "$UPD_STATUS" = 0 ] && [ "$(upd_get hooks/fetch-usage.sh)" = "<none>" ] && [ "$(upd_get hooks/check-statusline-update.sh)" = "<none>" ] && [ "$(upd_get skills/statustheme/SKILL.md)" = "<none>" ] && [ "$(upd_get commands/statusline-update.md)" = "<none>" ]; echo $?)"
+rm -rf "$UPD_TMP"
+
+# Script already current: companions are still refreshed (an older command
+# may have updated the script without them)
+upd_env "0.7.0" "0.7.0"
+upd_put hooks/fetch-usage.sh "old-fetch"; U_FETCH=$NEW_HOOK
+upd_run
+upd_check "c12-same-version-still-refreshes" "$([ "$UPD_STATUS" = 0 ] && [ "$(upd_get hooks/fetch-usage.sh)" = "$NEW_HOOK" ]; echo $?)"
+rm -rf "$UPD_TMP"
+
+# Downgrade abort leaves companions alone (a local repo ahead of GitHub)
+upd_env "0.5.0" "0.6.0"
+upd_put hooks/fetch-usage.sh "old-fetch"; U_FETCH=$NEW_HOOK
+upd_run
+upd_check "c12-downgrade-leaves-companions" "$([ "$UPD_STATUS" = 1 ] && [ "$(upd_get hooks/fetch-usage.sh)" = "old-fetch" ]; echo $?)"
+rm -rf "$UPD_TMP"
+
+# A hook that fails bash -n, a failed download, or a markdown file without
+# frontmatter keeps the old copy, and does not fail the update
+upd_env "0.7.0" "0.6.0"
+upd_put hooks/fetch-usage.sh "old-fetch"; upd_put hooks/check-statusline-update.sh "old-check"
+upd_put skills/statustheme/SKILL.md "old-skill"
+U_FETCH=$'#!/bin/bash\nif then'; U_CHECK=""; U_SKILL="<html>not found</html>"
+upd_run
+upd_check "c12-invalid-hook-keeps-old" "$([ "$UPD_STATUS" = 0 ] && [ "$(upd_get hooks/fetch-usage.sh)" = "old-fetch" ]; echo $?)"
+upd_check "c12-download-failure-keeps-old" "$([ "$(upd_get hooks/check-statusline-update.sh)" = "old-check" ]; echo $?)"
+upd_check "c12-md-without-frontmatter-keeps-old" "$([ "$(upd_get skills/statustheme/SKILL.md)" = "old-skill" ]; echo $?)"
+upd_check "c12-main-script-still-updated" "$(grep -q '"0.7.0"' "$UPD_TMP/home/.claude/statusline-hp.sh"; echo $?)"
+rm -rf "$UPD_TMP"
+
+# The theme skill frontmatter must use the key Claude Code reads
+# (user-invocable, hyphen); the underscore spelling is silently ignored.
+upd_check "c12-skill-frontmatter-key" "$(grep -qx 'user-invocable: true' "$SCRIPT_DIR/statusline-hp-SKILL.md" && ! grep -q 'user_invocable' "$SCRIPT_DIR/statusline-hp-SKILL.md"; echo $?)"
+
 # C9 subagentStatusLine mode — tasks[] payload emits {"id","content"} JSON lines
 # Helper: every non-empty output line must parse as JSON with id + content
 assert_subagent_json() {

@@ -1,7 +1,7 @@
 ---
 name: statustheme
 description: Switch status line theme (rpg or bloom)
-user_invocable: true
+user-invocable: true
 ---
 
 # Switch Status Line Theme
