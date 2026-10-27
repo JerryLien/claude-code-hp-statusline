@@ -5,6 +5,12 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-10-27
+
+- **Cache miss count** (`prompt_cache.misses`, Claude Code 2.1.251+): a yellow `✗N` after the cache segment counts this session's cache misses, requests that re-processed content the cache already held and wrote it to the cache again (`⚡92% 3m ✗2`, `⚡cold ✗3`). Zero, absent, or a non-integer value renders nothing, and nothing renders while the cache segment itself is hidden. `/cost` names the likely cause of each miss
+- Checked, no change: `/statustheme` takes effect on the next redraw. Claude Code re-applies the settings `env` to the status line within about a second of a settings.json edit, so the script's env-first theme lookup sees the new value (observed on 2.1.311)
+- Tests: +8 cases (warm and cold in both themes, yellow, zero / absent / boolean / string hidden) (267 → 275)
+
 ## [0.11.0] — 2026-10-27
 
 - **Subagent type on subagent rows** (`agentType`, Claude Code 2.1.293+): the type a subagent runs as (the built-in `Explore`, a custom `code-reviewer`) renders in grey before the row name, e.g. `⚔ Explore·find refs·haiku`. The default `general-purpose`, which every untyped spawn gets (confirmed in a live 2.1.311 payload), is hidden so it does not sit on nearly every row

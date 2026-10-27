@@ -486,6 +486,24 @@ assert_plain not_contains "c13-cache-unobserved-not-cold"   "rpg"   "$PC_UNOBSER
 assert_plain contains     "c13-cache-absent-keeps-ratio"    "rpg"   "$PC_ABSENT"     "⚡92%"
 assert_plain not_regex    "c13-cache-absent-no-countdown"   "rpg"   "$PC_ABSENT"     '⚡92% [0-9<]'
 
+# C15 prompt_cache.misses: requests that re-processed content the cache already
+# held. A positive count renders as a yellow ✗N after the cache segment, warm
+# or cold; zero, absent, or a non-integer value renders nothing.
+PC_WARM_MISS=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 200)),\"misses\":2}")
+PC_COLD_MISS=$(pc_json '{"warm":false,"caching_observed":true,"expires_at":null,"misses":3}')
+PC_ZERO_MISS=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 200)),\"misses\":0}")
+PC_BOOL_MISS=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 200)),\"misses\":true}")
+PC_STR_MISS=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 200)),\"misses\":\"2\"}")
+
+assert_plain contains     "c15-misses-warm-rpg"          "rpg"   "$PC_WARM_MISS" "⚡92% 3m ✗2"
+assert_plain contains     "c15-misses-warm-bloom"        "bloom" "$PC_WARM_MISS" "⚡92% 3m ✗2"
+assert_plain contains     "c15-misses-cold"              "rpg"   "$PC_COLD_MISS" "⚡cold ✗3"
+assert_contains           "c15-misses-yellow"            "rpg"   "$PC_WARM_MISS" $'\e[93m✗2'
+assert_plain not_contains "c15-misses-zero-hidden"       "rpg"   "$PC_ZERO_MISS" "✗"
+assert_plain not_contains "c15-misses-absent-hidden"     "rpg"   "$PC_WARM"      "✗"
+assert_plain not_contains "c15-misses-bool-ignored"      "rpg"   "$PC_BOOL_MISS" "✗"
+assert_plain not_contains "c15-misses-string-ignored"    "rpg"   "$PC_STR_MISS"  "✗"
+
 # C3 1M context window badge
 assert_contains "c3-1m-badge" "rpg" \
   '{"model":{"display_name":"Opus"},"context_window":{"context_window_size":1000000}}' \
