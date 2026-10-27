@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.10.0"
+STATUSLINE_HP_VERSION="0.11.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -175,8 +175,14 @@ for t in tasks:
             glyph = WAIT
         else:
             glyph = RUN
-        name = t.get("name") or t.get("label") or t.get("description") or t.get("type") or "agent"
-        parts = [glyph, f"{BOLD}{WHITE}{str(name)}{RESET}"]
+        # agentType (2.1.293+): Explore, a custom code-reviewer. The default
+        # general-purpose would sit on nearly every row, so it is hidden.
+        # type is always local_agent per the docs, so it is never a name.
+        at = t.get("agentType")
+        at = at if isinstance(at, str) and at and at != "general-purpose" else ""
+        name = str(t.get("name") or t.get("label") or t.get("description") or at or "agent")
+        tag = f"{GRAY}{at}·{RESET}" if at and name != at else ""
+        parts = [glyph, f"{tag}{BOLD}{WHITE}{name}{RESET}"]
         sm = short_model(t.get("model"))
         if sm:
             parts[-1] += f"{GRAY}·{sm}{RESET}"

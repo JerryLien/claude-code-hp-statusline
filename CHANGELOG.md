@@ -5,6 +5,13 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-10-27
+
+- **Subagent type on subagent rows** (`agentType`, Claude Code 2.1.293+): the type a subagent runs as (the built-in `Explore`, a custom `code-reviewer`) renders in grey before the row name, e.g. `⚔ Explore·find refs·haiku`. The default `general-purpose`, which every untyped spawn gets (confirmed in a live 2.1.311 payload), is hidden so it does not sit on nearly every row
+- The row-name fallback chain is now `name → label → description → agentType → "agent"`. It no longer falls back to `type`, which the docs define as always `local_agent`; when the name comes from `agentType` the grey tag is not repeated
+- README: field compatibility notes re-checked against the current statusline docs and Claude Code 2.1.311 (no main status line fields added or removed since 2.1.289)
+- Tests: +9 cases (tag in both themes and grey, `general-purpose` hidden with the name kept, absent `agentType`, `agentType` as name fallback without doubling, `general-purpose`-only falls back to `agent`, `type` never shown), and the old `type`-fallback case rewritten (258 → 267)
+
 ## [0.10.0] — 2026-10-04
 
 - **Prompt cache expiry** (`prompt_cache`, Claude Code 2.1.251+): while the cache is warm the `⚡` hit ratio gains its time to expiry in grey (`⚡92% 3m`, `<1m` in the last minute); once it is cold the ratio is replaced by a grey `⚡cold`, since the next request writes the whole context to the cache again. A `warm` flag whose `expires_at` has already passed counts as cold. Without `prompt_cache`, or while `caching_observed` is false, the ratio renders exactly as before. Claude Code re-runs the statusline when the cache expires; `refreshInterval` keeps the countdown moving while idle
