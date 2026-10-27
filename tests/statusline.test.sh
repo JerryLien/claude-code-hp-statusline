@@ -871,7 +871,7 @@ print(max([dw(l.rstrip("\n")) for l in sys.stdin] or [0]))')
   if [ "$widest" -le "$cols" ]; then PASS=$((PASS + 1)); echo "PASS: $name"
   else FAIL=$((FAIL + 1)); FAILED_NAMES+=("$name"); echo "FAIL: $name (widest row $widest > $cols)"; echo "  Rows: $(sub_plain "$theme" "$json")"; fi
 }
-FIT_START=$(( ($(date +%s) - 84) * 1000 ))
+FIT_START=$(( ( $(date +%s) - 3723 ) * 1000 ))  # 1h02m ago (minute-stable vs race)
 FIT_JSON() {  # <columns or ""> <label>
   local c=""
   [ -n "$1" ] && c="\"columns\":$1,"
@@ -884,7 +884,7 @@ assert_sub_fits         "c17-long-name-fits-bloom"      "bloom" "$(FIT_JSON 60 "
 assert_sub_fits         "c17-cjk-name-fits"             "rpg"   "$(FIT_JSON 60 "$FIT_CJK")"  60
 assert_sub contains     "c17-truncated-has-ellipsis"    "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "…"
 assert_sub contains     "c17-truncated-keeps-tag"       "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "⚔ Explore·investigate"
-assert_sub contains     "c17-truncated-keeps-tail"      "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "38.2k ♔1m24s"
+assert_sub contains     "c17-truncated-keeps-tail"      "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "38.2k ♔1h02m"
 assert_sub contains     "c17-truncated-keeps-model"     "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "…·haiku"
 assert_sub contains     "c17-wide-enough-unchanged"     "rpg"   "$(FIT_JSON 174 "$FIT_LONG")" "$FIT_LONG·haiku"
 assert_sub contains     "c17-no-columns-unchanged"      "rpg"   "$(FIT_JSON "" "$FIT_LONG")"  "$FIT_LONG·haiku"
