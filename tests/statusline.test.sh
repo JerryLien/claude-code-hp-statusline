@@ -769,14 +769,53 @@ assert_contains "c9-elapsed-hours" "rpg" "$SUB_JSON" "♔1h02m"
 assert_contains "c9-spark-rpg" "rpg" "$SUB_JSON" "▃▅█"
 assert_contains "c9-spark-bloom" "bloom" "$SUB_JSON" "🌿🌸🌼"
 
-# name fallback chain: no name → label; no name/label → description; → type
+# name fallback chain: no name → label; no name/label → description;
+# → agentType (except the default general-purpose) → "agent". `type` is never
+# used: the docs define it as always local_agent, which says nothing.
 assert_contains "c9-name-fallback-label" "rpg" "$SUB_JSON" "verify:bugs"
 assert_contains "c9-name-fallback-description" "rpg" \
   '{"tasks":[{"id":"a","status":"running","description":"only-desc","tokenCount":5}]}' \
   "only-desc"
-assert_contains "c9-name-fallback-type" "rpg" \
-  '{"tasks":[{"id":"a","status":"running","type":"local_bash","tokenCount":5}]}' \
-  "local_bash"
+assert_not_contains "c9-name-fallback-skips-type" "rpg" \
+  '{"tasks":[{"id":"a","status":"running","type":"local_agent","tokenCount":5}]}' \
+  "local_agent"
+
+# C14 agentType (Claude Code 2.1.293+): the subagent type ("Explore", a custom
+# "code-reviewer") renders in grey before the row name. The default
+# general-purpose (what an untyped spawn gets; seen in a live 2.1.311 payload)
+# is hidden, since it would sit on nearly every row.
+# sub_plain <theme> <json>: one row per line, ANSI stripped from content
+sub_plain() {
+  printf '%s\n' "$2" | STATUSLINE_THEME="$1" "$STATUSLINE" 2>/dev/null | python3 -c '
+import json, re, sys
+for line in sys.stdin:
+    line = line.strip()
+    if line:
+        print(re.sub(r"\x1b\[[0-9;]*m", "", json.loads(line).get("content", "")))'
+}
+assert_sub() {  # <contains|not_contains> <name> <theme> <json> <pattern>
+  local mode=$1 name=$2 theme=$3 json=$4 pattern=$5 out ok=1
+  out=$(sub_plain "$theme" "$json")
+  if printf '%s\n' "$out" | grep -qF -- "$pattern"; then [ "$mode" = contains ] && ok=0
+  else [ "$mode" = not_contains ] && ok=0; fi
+  if [ "$ok" = 0 ]; then PASS=$((PASS + 1)); echo "PASS: $name"
+  else FAIL=$((FAIL + 1)); FAILED_NAMES+=("$name"); echo "FAIL: $name"; echo "  $mode: $pattern"; echo "  Rows: $out"; fi
+}
+AT_EXPLORE='{"tasks":[{"id":"a","status":"running","type":"local_agent","agentType":"Explore","description":"d","label":"find refs","model":"claude-haiku-5-5","tokenCount":5}]}'
+AT_GP='{"tasks":[{"id":"a","status":"running","type":"local_agent","agentType":"general-purpose","description":"d","label":"find refs","tokenCount":5}]}'
+AT_NONE='{"tasks":[{"id":"a","status":"running","type":"local_agent","description":"d","label":"find refs","tokenCount":5}]}'
+AT_ONLY='{"tasks":[{"id":"a","status":"running","type":"local_agent","agentType":"code-reviewer","tokenCount":5}]}'
+AT_GP_ONLY='{"tasks":[{"id":"a","status":"running","type":"local_agent","agentType":"general-purpose","tokenCount":5}]}'
+
+assert_sub contains     "c14-agent-type-tag-rpg"             "rpg"   "$AT_EXPLORE" "⚔ Explore·find refs·haiku"
+assert_sub contains     "c14-agent-type-tag-bloom"           "bloom" "$AT_EXPLORE" "Explore·find refs"
+assert_contains         "c14-agent-type-tag-is-gray"         "rpg"   "$AT_EXPLORE" '\u001b[90mExplore·\u001b[0m'
+assert_sub not_contains "c14-general-purpose-hidden"         "rpg"   "$AT_GP"      "general-purpose"
+assert_sub contains     "c14-general-purpose-keeps-name"     "rpg"   "$AT_GP"      "⚔ find refs"
+assert_sub contains     "c14-agent-type-absent-no-tag"       "rpg"   "$AT_NONE"    "⚔ find refs"
+assert_sub contains     "c14-agent-type-as-name-fallback"    "rpg"   "$AT_ONLY"    "⚔ code-reviewer"
+assert_sub not_contains "c14-agent-type-not-doubled"         "rpg"   "$AT_ONLY"    "code-reviewer·code-reviewer"
+assert_sub contains     "c14-general-purpose-only-is-agent"  "rpg"   "$AT_GP_ONLY" "⚔ agent"
 
 # single-sample task renders no sparkline; missing startTime renders no clock
 assert_not_contains "c9-single-sample-no-spark" "rpg" \

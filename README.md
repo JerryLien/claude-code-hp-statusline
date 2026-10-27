@@ -88,9 +88,10 @@ the `tasks[]` payload and switches modes:
 ```
 
 Each running subagent gets a themed row: status glyph (RPG `⚔` running / `💀`
-completed / `☠` failed; Bloom `🌱` / `🌸` / `🥀`), agent name, the model short
-name and reasoning effort, a token-burn sparkline built from the recent
-`tokenSamples` history (`▂▃▅█` in RPG, flower stages in Bloom), the compact
+completed / `☠` failed; Bloom `🌱` / `🌸` / `🥀`), the subagent type in grey
+when it is not the default (`Explore·`, `code-reviewer·`; needs Claude Code
+2.1.293+), agent name, the model short name and reasoning effort, a token-burn
+sparkline built from the recent `tokenSamples` history (`▂▃▅█` in RPG, flower stages in Bloom), the compact
 token total, and elapsed time. Rows the script cannot render fall back to
 Claude Code's default rendering automatically.
 
@@ -112,7 +113,7 @@ Since 0.8.0 each row also carries three per-task details:
 ## Field compatibility notes
 
 Every field this script consumes is in the official statusline schema docs
-(checked against the docs and Claude Code v2.1.289), with one exception:
+(checked against the docs and Claude Code v2.1.311), with one exception:
 
 - **`pr.kind: "cr"`** — drives the `🔍` code-review PR icon. The docs only list
   `"mr"` (GitLab merge request); `"cr"` was seen by inspecting v2.1.201 and may
