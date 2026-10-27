@@ -1,0 +1,41 @@
+name: test
+
+# Runs the test suite on every pull request and on pushes to main.
+# No third-party actions: the checkout is plain git on the runner, so the only
+# code that runs is this repository's own. Values from the event go through
+# env, never straight into the shell script.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          git init -q .
+          git fetch -q --depth 1 "$REPO_URL" "$REF"
+          git checkout -q FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$SHA"
+          git log -1 --format='%h %s'
+
+      - name: Syntax check
+        run: |
+          bash -n statusline-hp.sh
+          bash -n hooks/check-update.sh
+          bash -n hooks/fetch-usage.sh
+          sed -n '/^```bash$/,/^```$/p' commands/statusline-update.md | sed '1d;$d' | bash -n
+
+      - name: Tests
+        run: ./tests/statusline.test.sh

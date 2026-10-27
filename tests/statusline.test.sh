@@ -835,6 +835,60 @@ assert_sub contains     "c14-agent-type-as-name-fallback"    "rpg"   "$AT_ONLY" 
 assert_sub not_contains "c14-agent-type-not-doubled"         "rpg"   "$AT_ONLY"    "code-reviewer·code-reviewer"
 assert_sub contains     "c14-general-purpose-only-is-agent"  "rpg"   "$AT_GP_ONLY" "⚔ agent"
 
+# C16 a subagent working in its own directory (an isolated worktree) gets 🌳
+# before its name. Detected by the task cwd differing from the session cwd
+# (both in the payload; a live 2.1.311 worktree spawn reported
+# <repo>/.claude/worktrees/agent-<id> against the session's <repo>).
+WT_TASK() {  # <session cwd or ""> <task cwd or "">
+  local top="" tc=""
+  [ -n "$1" ] && top="\"cwd\":\"$1\","
+  [ -n "$2" ] && tc=",\"cwd\":\"$2\""
+  printf '{%s"columns":174,"tasks":[{"id":"a","status":"running","type":"local_agent","agentType":"Explore","label":"find refs","tokenCount":5%s}]}' "$top" "$tc"
+}
+assert_sub contains     "c16-worktree-marked-rpg"       "rpg"   "$(WT_TASK /r /r/.claude/worktrees/agent-1)" "⚔ 🌳Explore·find refs"
+assert_sub contains     "c16-worktree-marked-bloom"     "bloom" "$(WT_TASK /r /r/.claude/worktrees/agent-1)" "🌳Explore·find refs"
+assert_sub not_contains "c16-same-cwd-unmarked"         "rpg"   "$(WT_TASK /r /r)"                           "🌳"
+assert_sub not_contains "c16-trailing-slash-same-cwd"   "rpg"   "$(WT_TASK /r/ /r)"                          "🌳"
+assert_sub not_contains "c16-task-cwd-absent-unmarked"  "rpg"   "$(WT_TASK /r "")"                           "🌳"
+assert_sub not_contains "c16-session-cwd-absent-unmarked" "rpg" "$(WT_TASK "" /r/.claude/worktrees/agent-1)" "🌳"
+
+# C17 rows fit the payload's columns: when a row is wider, only the name text
+# is shortened with "…"; the status glyph, type tag, model, effort, sparkline,
+# token count and clock stay. Width counts wide characters (CJK, emoji) as 2.
+# assert_sub_fits <name> <theme> <json> <cols>: every row's display width <= cols
+assert_sub_fits() {
+  local name=$1 theme=$2 json=$3 cols=$4 widest
+  widest=$(sub_plain "$theme" "$json" | python3 -c '
+import sys, unicodedata
+def dw(s):
+    w = 0
+    for ch in s:
+        if unicodedata.category(ch).startswith("M"):
+            continue
+        w += 2 if unicodedata.east_asian_width(ch) in ("W", "F") or ord(ch) >= 0x2600 else 1
+    return w
+print(max([dw(l.rstrip("\n")) for l in sys.stdin] or [0]))')
+  if [ "$widest" -le "$cols" ]; then PASS=$((PASS + 1)); echo "PASS: $name"
+  else FAIL=$((FAIL + 1)); FAILED_NAMES+=("$name"); echo "FAIL: $name (widest row $widest > $cols)"; echo "  Rows: $(sub_plain "$theme" "$json")"; fi
+}
+FIT_START=$(( ($(date +%s) - 84) * 1000 ))
+FIT_JSON() {  # <columns or ""> <label>
+  local c=""
+  [ -n "$1" ] && c="\"columns\":$1,"
+  printf '{%s"tasks":[{"id":"a","status":"running","type":"local_agent","agentType":"Explore","label":"%s","model":"claude-haiku-5-5","effort":"high","startTime":%s,"tokenCount":38200,"tokenSamples":[100,200,400,800]}]}' "$c" "$2" "$FIT_START"
+}
+FIT_LONG="investigate why the statusline subagent rows overflow on narrow terminals and propose a fix"
+FIT_CJK="找出所有呼叫狀態列子代理列渲染的位置並整理成表格回報給主對話"
+assert_sub_fits         "c17-long-name-fits-rpg"        "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" 60
+assert_sub_fits         "c17-long-name-fits-bloom"      "bloom" "$(FIT_JSON 60 "$FIT_LONG")" 60
+assert_sub_fits         "c17-cjk-name-fits"             "rpg"   "$(FIT_JSON 60 "$FIT_CJK")"  60
+assert_sub contains     "c17-truncated-has-ellipsis"    "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "…"
+assert_sub contains     "c17-truncated-keeps-tag"       "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "⚔ Explore·investigate"
+assert_sub contains     "c17-truncated-keeps-tail"      "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "38.2k ♔1m24s"
+assert_sub contains     "c17-truncated-keeps-model"     "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "…·haiku"
+assert_sub contains     "c17-wide-enough-unchanged"     "rpg"   "$(FIT_JSON 174 "$FIT_LONG")" "$FIT_LONG·haiku"
+assert_sub contains     "c17-no-columns-unchanged"      "rpg"   "$(FIT_JSON "" "$FIT_LONG")"  "$FIT_LONG·haiku"
+
 # single-sample task renders no sparkline; missing startTime renders no clock
 assert_not_contains "c9-single-sample-no-spark" "rpg" \
   '{"tasks":[{"id":"a","status":"running","label":"x","tokenCount":5,"tokenSamples":[5]}]}' \

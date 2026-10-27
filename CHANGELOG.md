@@ -5,6 +5,13 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-10-27
+
+- **Worktree marker on subagent rows**: `🌳` before the name when the subagent works in its own directory, such as an isolated worktree. Detected by the task `cwd` differing from the session `cwd`, both in the payload (a live 2.1.311 worktree spawn reported `<repo>/.claude/worktrees/agent-<id>`). Trailing slashes are ignored; a missing `cwd` on either side shows nothing
+- **Subagent rows fit the panel**: when a row is wider than the payload's `columns`, only the name text is shortened with `…`. The status glyph, `🌳`, type tag, model, effort, sparkline, token count and clock stay. Width counts CJK and emoji as two cells, the same rule as the main row. Without `columns` nothing is shortened
+- **CI**: GitHub Actions runs the test suite and a `bash -n` check of every script on each pull request and push to `main`. No third-party actions: the checkout is plain `git`, permissions are read-only, and event values reach the shell only through `env`
+- Tests: +15 cases (worktree marker in both themes, same cwd, trailing slash, either cwd absent; rows fit 60 columns in both themes and with CJK, ellipsis, tag / model / numbers kept, wide enough or no `columns` leaves the name whole) (275 → 290)
+
 ## [0.12.0] — 2026-10-27
 
 - **Cache miss count** (`prompt_cache.misses`, Claude Code 2.1.251+): a yellow `✗N` after the cache segment counts this session's cache misses, requests that re-processed content the cache already held and wrote it to the cache again (`⚡92% 3m ✗2`, `⚡cold ✗3`). Zero, absent, or a non-integer value renders nothing, and nothing renders while the cache segment itself is hidden. `/cost` names the likely cause of each miss

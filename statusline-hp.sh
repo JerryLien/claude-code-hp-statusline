@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.12.0"
+STATUSLINE_HP_VERSION="0.13.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -22,7 +22,7 @@ input=$(cat)
 # defaults); exit 1 = not a subagent payload, fall through to the main flow.
 if [[ "$input" == *'"tasks"'* ]]; then
   if subagent_out=$(INPUT="$input" python3 -c '
-import json, os, sys, time
+import json, os, re, sys, time, unicodedata
 
 try:
     d = json.loads(os.environ.get("INPUT", "{}"))
@@ -32,6 +32,40 @@ except:
 tasks = d.get("tasks")
 if not isinstance(tasks, list):
     sys.exit(1)
+
+def norm_dir(p):
+    if not isinstance(p, str) or not p:
+        return ""
+    return p.rstrip("/") or "/"
+
+# Session cwd: a task cwd that differs means the subagent works in its own
+# directory, such as an isolated worktree. columns: usable row width.
+session_cwd = norm_dir(d.get("cwd"))
+cols = d.get("columns")
+cols = cols if isinstance(cols, int) and not isinstance(cols, bool) and cols > 0 else 0
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+def cw(ch):
+    # Display cells for one character, matching the main row measurement
+    if unicodedata.category(ch).startswith("M"):
+        return 0
+    if unicodedata.east_asian_width(ch) in ("W", "F") or ord(ch) >= 0x2600:
+        return 2
+    return 1
+
+def dw(text):
+    return sum(cw(ch) for ch in ANSI_RE.sub("", text))
+
+def clip(text, width):
+    # Longest prefix that fits in width cells, ending in an ellipsis
+    out, used = "", 0
+    for ch in text:
+        if used + cw(ch) > width - 1:
+            break
+        out += ch
+        used += cw(ch)
+    return out + "\u2026"
 
 theme = os.environ.get("STATUSLINE_THEME", "")
 if not theme:
@@ -182,23 +216,35 @@ for t in tasks:
         at = at if isinstance(at, str) and at and at != "general-purpose" else ""
         name = str(t.get("name") or t.get("label") or t.get("description") or at or "agent")
         tag = f"{GRAY}{at}·{RESET}" if at and name != at else ""
-        parts = [glyph, f"{tag}{BOLD}{WHITE}{name}{RESET}"]
+        tcwd = norm_dir(t.get("cwd"))
+        wt = "\U0001F333" if session_cwd and tcwd and tcwd != session_cwd else ""
+        after = ""
         sm = short_model(t.get("model"))
         if sm:
-            parts[-1] += f"{GRAY}·{sm}{RESET}"
+            after += f"{GRAY}·{sm}{RESET}"
         eb = effort_badge(t.get("effort"))
         if eb:
-            parts[-1] += eb
+            after += eb
+        tail = []
         sp = spark(t.get("tokenSamples"))
         if sp:
-            parts.append(sp if bloom else f"{CYAN}{sp}{RESET}")
+            tail.append(sp if bloom else f"{CYAN}{sp}{RESET}")
         tc = t.get("tokenCount") or 0
         tcol = token_color(tc, t.get("contextWindowSize"))
-        parts.append(f"{tcol}{compact(tc)}{RESET}" if tcol else compact(tc))
+        tail.append(f"{tcol}{compact(tc)}{RESET}" if tcol else compact(tc))
         el = elapsed(t.get("startTime"))
         if el:
-            parts.append(f"{GRAY}{CLOCK}{el}{RESET}")
-        print(json.dumps({"id": tid, "content": " ".join(parts)}, ensure_ascii=False))
+            tail.append(f"{GRAY}{CLOCK}{el}{RESET}")
+
+        def row(nm):
+            return " ".join([glyph, f"{wt}{tag}{BOLD}{WHITE}{nm}{RESET}{after}"] + tail)
+
+        content = row(name)
+        if cols and dw(content) > cols:
+            # Too wide: shorten only the name so the numbers on the right stay
+            room = cols - (dw(content) - dw(name))
+            content = row(clip(name, room) if room >= 2 else "\u2026")
+        print(json.dumps({"id": tid, "content": content}, ensure_ascii=False))
     except:
         continue
 '); then

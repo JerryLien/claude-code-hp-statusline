@@ -88,12 +88,15 @@ the `tasks[]` payload and switches modes:
 ```
 
 Each running subagent gets a themed row: status glyph (RPG `⚔` running / `💀`
-completed / `☠` failed; Bloom `🌱` / `🌸` / `🥀`), the subagent type in grey
+completed / `☠` failed; Bloom `🌱` / `🌸` / `🥀`), `🌳` when the subagent works
+in its own directory such as an isolated worktree, the subagent type in grey
 when it is not the default (`Explore·`, `code-reviewer·`; needs Claude Code
 2.1.293+), agent name, the model short name and reasoning effort, a token-burn
-sparkline built from the recent `tokenSamples` history (`▂▃▅█` in RPG, flower stages in Bloom), the compact
-token total, and elapsed time. Rows the script cannot render fall back to
-Claude Code's default rendering automatically.
+sparkline built from the recent `tokenSamples` history (`▂▃▅█` in RPG, flower
+stages in Bloom), the compact token total, and elapsed time. A row wider than
+the panel has its name shortened with `…`, so the numbers on the right stay
+visible. Rows the script cannot render fall back to Claude Code's default
+rendering automatically.
 
 Since 0.8.0 each row also carries three per-task details:
 
@@ -330,3 +333,10 @@ Add to `~/.claude/settings.json` for a full bloom experience:
 ```
 
 Or just paste this repo URL into Claude Code and ask it to set up the status line for you.
+
+## Development
+
+Run the test suite with `./tests/statusline.test.sh`. GitHub Actions runs the
+same suite, plus a `bash -n` syntax check of every script, on each pull request
+and push to `main` (`.github/workflows/test.yml`). The workflow uses no
+third-party actions: it checks out with plain `git` and has read-only access.
