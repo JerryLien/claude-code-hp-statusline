@@ -19,7 +19,7 @@ The default status line tells you very little. This one turns everything that ma
 - ❤ **Health-bar rate limits** — 5-hour and 7-day windows with countdown to reset
 - ❤ **Per-model weekly caps** — a third bar for model-scoped limits such as the Fable weekly cap (needs the optional usage hook, see below)
 - 🧠 **Context window meter** — know exactly how much headroom you have
-- ⚡ **Cache hit ratio** — realtime feedback that your prompt caching is actually working, plus how long a warm cache has left and a grey `⚡cold` once it expires
+- ⚡ **Cache hit ratio** — realtime feedback that your prompt caching is actually working, plus how long a warm cache has left, a grey `⚡cold` once it expires, and a yellow `✗N` cache-miss count
 - ⚠ **200k threshold alert** — loud warning the moment per-token pricing jumps
 - 🔮 **Total casting time** — how long you've been waiting on Claude this session
 - 💰 **Session cost** — equivalent API cost, even on Pro/Max subscriptions
@@ -57,7 +57,7 @@ The default status line tells you very little. This one turns everything that ma
 
 ### Smart alerts
 
-- **⚡ Cache hit ratio** — Green ≥70%, yellow ≥30%, red <30%. A great real-time check that prompt caching is actually working. With Claude Code 2.1.251+ (`prompt_cache`), a warm cache adds its time to expiry in grey (`⚡87% 3m`, `<1m` in the last minute), and once it has gone cold the ratio is replaced by a grey `⚡cold`: the next request writes the whole context to the cache again. Claude Code re-runs the statusline the moment the cache expires; set `refreshInterval` so the countdown keeps moving while idle
+- **⚡ Cache hit ratio** — Green ≥70%, yellow ≥30%, red <30%. A great real-time check that prompt caching is actually working. With Claude Code 2.1.251+ (`prompt_cache`), a warm cache adds its time to expiry in grey (`⚡87% 3m`, `<1m` in the last minute), and once it has gone cold the ratio is replaced by a grey `⚡cold`: the next request writes the whole context to the cache again. Claude Code re-runs the statusline the moment the cache expires; set `refreshInterval` so the countdown keeps moving while idle. A yellow `✗N` after the cache segment counts this session's cache misses (`prompt_cache.misses`): requests that re-processed content the cache already held, each one writing it to the cache again. `/cost` names the likely cause of each miss
 - **⚠ 200k** — Red warning badge when the session crosses the 200k-token threshold (where per-token pricing jumps)
 - **🔮 / 🌿 Casting time + wall time** — Total time spent waiting on Claude API responses, followed by total session wall time (e.g. `🔮 2m14s/45m`). RPG: 🔮 crystal ball · Bloom: 🌿 growing plant
 - **v2.1.100→2.1.105** — Version badge goes yellow-highlighted with the target version when a newer release is detected in Claude Code's local changelog cache

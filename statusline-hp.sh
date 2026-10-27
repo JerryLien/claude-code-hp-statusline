@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.11.0"
+STATUSLINE_HP_VERSION="0.12.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -347,6 +347,12 @@ if isinstance(pc, dict) and pc.get("caching_observed") is True:
                 cache_ttl = "<1m"
     else:
         cache_state = "cold"
+# misses: requests that re-processed content the cache already held
+cache_misses = 0
+if cache_state:
+    mv = pc.get("misses")
+    if isinstance(mv, int) and not isinstance(mv, bool) and mv > 0:
+        cache_misses = mv
 
 ctx_size = g(d, "context_window", "context_window_size") or 0
 is_1m_ctx = 1 if ctx_size >= 1_000_000 else 0
@@ -442,6 +448,7 @@ print(f"FAST_MODE={fast_mode}")
 print(f"CACHE_PCT={cache_pct}")
 print(f"CACHE_STATE=\"{cache_state}\"")
 print(f"CACHE_TTL=\"{sh(cache_ttl)}\"")
+print(f"CACHE_MISSES={cache_misses}")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
 print(f"IS_1M_CTX={is_1m_ctx}")
 print(f"THINKING_OFF={thinking_off}")
@@ -721,14 +728,21 @@ parts_row2+="  $(ctx_bar "$CTX")"
 
 # Cache hit ratio; a warm prompt cache adds its time to expiry, a cold one
 # replaces the ratio (the next request re-caches regardless of the last ratio)
+cache_shown=0
 if [ "${CACHE_STATE:-}" = "cold" ]; then
   parts_row2+=" ${GRAY}⚡cold${RESET}"
+  cache_shown=1
 elif [ "${CACHE_PCT:-"-1"}" -ge 0 ] 2>/dev/null; then
   if [ "$CACHE_PCT" -ge 70 ]; then cache_color="$BRIGHT_GREEN"
   elif [ "$CACHE_PCT" -ge 30 ]; then cache_color="$BRIGHT_YELLOW"
   else cache_color="$BRIGHT_RED"; fi
   parts_row2+=" ${cache_color}⚡${CACHE_PCT}%${RESET}"
   [ -n "${CACHE_TTL:-}" ] && parts_row2+="${GRAY} ${CACHE_TTL}${RESET}"
+  cache_shown=1
+fi
+# Cache misses this session (prompt_cache.misses), after the cache segment
+if [ "$cache_shown" = 1 ] && [ "${CACHE_MISSES:-0}" -gt 0 ] 2>/dev/null; then
+  parts_row2+=" ${BRIGHT_YELLOW}✗${CACHE_MISSES}${RESET}"
 fi
 
 # 200k threshold: exceeds_200k_tokens is a fixed 200k flag regardless of
