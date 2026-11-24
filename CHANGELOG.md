@@ -5,6 +5,9 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+- **Fix: per-model weekly cap bar on macOS**: `hooks/fetch-usage.sh` read the OAuth token only from `~/.claude/.credentials.json`, which Claude Code does not create on macOS (it keeps the credentials in the login Keychain), so the hook always exited and the Fable bar never appeared there. When the file is absent the hook now reads the `Claude Code-credentials` Keychain item with `security`. The file still wins when present. The Keychain read runs in the detached fetch, after the throttle, so the foreground never waits on it, and the credentials reach `python3` on stdin, keeping the token out of `ps`
+- Tests: the hook cases put a fake `security` on `PATH`, so the suite never reads the real Keychain. Fixed a `$FIT_LONG·` expansion that macOS bash 3.2 read as part of the variable name, which aborted the suite at c17 under `set -u`. +4 cases (Keychain-only fetch, Keychain token sent, Keychain token never cached, file preferred over Keychain) (290 → 294)
+
 ## [0.13.0] — 2026-10-27
 
 - **Worktree marker on subagent rows**: `🌳` before the name when the subagent works in its own directory, such as an isolated worktree. Detected by the task `cwd` differing from the session `cwd`, both in the payload (a live 2.1.311 worktree spawn reported `<repo>/.claude/worktrees/agent-<id>`). Trailing slashes are ignored; a missing `cwd` on either side shows nothing

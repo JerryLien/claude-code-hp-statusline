@@ -886,8 +886,8 @@ assert_sub contains     "c17-truncated-has-ellipsis"    "rpg"   "$(FIT_JSON 60 "
 assert_sub contains     "c17-truncated-keeps-tag"       "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "⚔ Explore·investigate"
 assert_sub contains     "c17-truncated-keeps-tail"      "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "38.2k ♔1h02m"
 assert_sub contains     "c17-truncated-keeps-model"     "rpg"   "$(FIT_JSON 60 "$FIT_LONG")" "…·haiku"
-assert_sub contains     "c17-wide-enough-unchanged"     "rpg"   "$(FIT_JSON 174 "$FIT_LONG")" "$FIT_LONG·haiku"
-assert_sub contains     "c17-no-columns-unchanged"      "rpg"   "$(FIT_JSON "" "$FIT_LONG")"  "$FIT_LONG·haiku"
+assert_sub contains     "c17-wide-enough-unchanged"     "rpg"   "$(FIT_JSON 174 "$FIT_LONG")" "${FIT_LONG}·haiku"
+assert_sub contains     "c17-no-columns-unchanged"      "rpg"   "$(FIT_JSON "" "$FIT_LONG")"  "${FIT_LONG}·haiku"
 
 # single-sample task renders no sparkline; missing startTime renders no clock
 assert_not_contains "c9-single-sample-no-spark" "rpg" \
@@ -1458,20 +1458,41 @@ USAGE_FIXTURE='{"five_hour":{"utilization":4.0},"seven_day":{"utilization":12.0}
    "scope":{"model":{"id":null,"display_name":"Fable"},"surface":null}}
  ]}'
 
-# run_fetch_hook <have_creds 0/1> <curl_exit> <prefill_cache_json or "">
-# Sets FH_STATUS, FH_CACHE (file content or "<none>"), FH_CURL_CALLED (0/1)
+# Fake macOS `security`: prints $FAKE_KEYCHAIN_JSON for the Claude Code
+# service, else exits 44 (item not found). Every hook run below puts it on
+# PATH so the suite never reads the real Keychain.
+# fake_security <bin dir>
+fake_security() {
+  cat > "$1/security" <<'FAKE'
+#!/bin/bash
+[ "$1" = find-generic-password ] || exit 1
+svc=""
+while [ $# -gt 0 ]; do case "$1" in -s) svc="$2"; shift 2 ;; *) shift ;; esac; done
+[ "$svc" = "Claude Code-credentials" ] && [ -n "${FAKE_KEYCHAIN_JSON:-}" ] || exit 44
+printf '%s\n' "$FAKE_KEYCHAIN_JSON"
+FAKE
+  chmod +x "$1/security"
+}
+
+# run_fetch_hook <have_creds 0/1/keychain> <curl_exit> <prefill_cache_json or "">
+# have_creds: 1 = credentials file, keychain = Keychain only, 0 = neither.
+# Sets FH_STATUS, FH_CACHE (file content or "<none>"), FH_CURL_CALLED (0/1),
+# FH_AUTH (Authorization header the fake curl received, or "<none>")
 run_fetch_hook() {
   local have_creds=$1 curl_exit=$2 prefill=$3
-  local tmp
+  local tmp keychain_json=""
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fetchusage.XXXXXX") || return 1
   mkdir -p "$tmp/bin" "$tmp/home/.claude/cache"
+  fake_security "$tmp/bin"
+  [ "$have_creds" = keychain ] && keychain_json='{"claudeAiOauth":{"accessToken":"sk-ant-oat01-KEYCHAINTOKEN"}}'
   cat > "$tmp/bin/curl" <<'FAKE'
 #!/bin/bash
 touch "$FAKE_CURL_MARKER"
 out=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    -o|-H|--max-time) [ "$1" = -o ] && out="$2"; shift 2 ;;
+    -H) case "$2" in @*) grep -i '^Authorization:' "${2#@}" > "$FAKE_CURL_MARKER" ;; esac; shift 2 ;;
+    -o|--max-time) [ "$1" = -o ] && out="$2"; shift 2 ;;
     -*) shift ;;
     *)  shift ;;
   esac
@@ -1483,7 +1504,8 @@ FAKE
   [ "$have_creds" = 1 ] && printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-FAKETOKENXYZ","subscriptionType":"max"}}\n' > "$tmp/home/.claude/.credentials.json"
   [ -n "$prefill" ] && printf '%s\n' "$prefill" > "$tmp/home/.claude/cache/usage-limits.json"
   HOME="$tmp/home" PATH="$tmp/bin:$PATH" FAKE_CURL_MARKER="$tmp/curl.called" \
-    FAKE_CURL_EXIT="$curl_exit" FAKE_USAGE_JSON="$USAGE_FIXTURE" bash "$FETCH_HOOK" >/dev/null 2>&1
+    FAKE_CURL_EXIT="$curl_exit" FAKE_USAGE_JSON="$USAGE_FIXTURE" FAKE_KEYCHAIN_JSON="$keychain_json" \
+    bash "$FETCH_HOOK" >/dev/null 2>&1
   FH_STATUS=$?
   # the fetch is detached; give it a moment
   local i; for i in 1 2 3 4 5 6 7 8 9 10; do
@@ -1491,6 +1513,7 @@ FAKE
   done
   sleep 0.3
   FH_CURL_CALLED=0; [ -f "$tmp/curl.called" ] && FH_CURL_CALLED=1
+  FH_AUTH="<none>"; [ -s "$tmp/curl.called" ] && FH_AUTH=$(cat "$tmp/curl.called")
   FH_CACHE="<none>"; [ -f "$tmp/home/.claude/cache/usage-limits.json" ] && FH_CACHE=$(cat "$tmp/home/.claude/cache/usage-limits.json")
   rm -rf "$tmp"
 }
@@ -1512,6 +1535,15 @@ fh_check "c10-hook-never-writes-token" "$(printf '%s' "$FH_CACHE" | grep -q FAKE
 run_fetch_hook 0 0 ""
 fh_check "c10-hook-no-creds-skips" "$([ "$FH_STATUS" = 0 ] && [ "$FH_CURL_CALLED" = 0 ] && [ "$FH_CACHE" = "<none>" ]; echo $?)"
 
+# macOS: no credentials file, token in the Keychain (C18)
+run_fetch_hook keychain 0 ""
+fh_check "c18-hook-keychain-fetches" "$([ "$FH_STATUS" = 0 ] && [ "$FH_CURL_CALLED" = 1 ] && printf '%s' "$FH_CACHE" | grep -q Fable; echo $?)"
+fh_check "c18-hook-keychain-token-sent" "$(printf '%s' "$FH_AUTH" | grep -q 'Bearer sk-ant-oat01-KEYCHAINTOKEN'; echo $?)"
+fh_check "c18-hook-keychain-never-writes-token" "$(printf '%s' "$FH_CACHE" | grep -q KEYCHAINTOKEN; [ $? = 1 ]; echo $?)"
+
+run_fetch_hook 1 0 ""
+fh_check "c18-hook-file-wins-over-keychain" "$(printf '%s' "$FH_AUTH" | grep -q 'Bearer sk-ant-oat01-FAKETOKENXYZ'; echo $?)"
+
 run_fetch_hook 1 0 '[{"label":"Stale","percent":1,"resets_at":1}]'
 fh_check "c10-hook-fresh-cache-skips-network" "$([ "$FH_CURL_CALLED" = 0 ] && printf '%s' "$FH_CACHE" | grep -q Stale; echo $?)"
 
@@ -1522,6 +1554,7 @@ run_fetch_hook_old() {
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fetchusage.XXXXXX") || return 1
   mkdir -p "$tmp/bin" "$tmp/home/.claude/cache"
   printf '#!/bin/bash\ntouch "$FAKE_CURL_MARKER"; exit %s\n' "$curl_exit" > "$tmp/bin/curl"; chmod +x "$tmp/bin/curl"
+  fake_security "$tmp/bin"
   printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-FAKETOKENXYZ"}}\n' > "$tmp/home/.claude/.credentials.json"
   printf '[{"label":"Old","percent":9,"resets_at":1}]\n' > "$tmp/home/.claude/cache/usage-limits.json"
   touch -d "2 minutes ago" "$tmp/home/.claude/cache/usage-limits.json"
@@ -1563,6 +1596,7 @@ exit 0
 FAKE
   chmod +x "$FH_TMP/bin/curl"
   FH_CURL_EXIT=$curl_exit
+  fake_security "$FH_TMP/bin"
   printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-FAKETOKENXYZ"}}\n' > "$FH_TMP/home/.claude/.credentials.json"
   printf '[{"label":"Old","percent":9,"resets_at":1}]\n' > "$FH_TMP/home/.claude/cache/usage-limits.json"
   touch -d "2 minutes ago" "$FH_TMP/home/.claude/cache/usage-limits.json"
