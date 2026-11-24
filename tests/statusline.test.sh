@@ -495,14 +495,66 @@ PC_ZERO_MISS=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",
 PC_BOOL_MISS=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 200)),\"misses\":true}")
 PC_STR_MISS=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 200)),\"misses\":\"2\"}")
 
-assert_plain contains     "c15-misses-warm-rpg"          "rpg"   "$PC_WARM_MISS" "⚡92% 3m ✗2"
-assert_plain contains     "c15-misses-warm-bloom"        "bloom" "$PC_WARM_MISS" "⚡92% 3m ✗2"
+assert_plain contains     "c15-misses-warm-rpg"          "rpg"   "$PC_WARM_MISS" "⚡92% 3m/5m ✗2"
+assert_plain contains     "c15-misses-warm-bloom"        "bloom" "$PC_WARM_MISS" "⚡92% 3m/5m ✗2"
 assert_plain contains     "c15-misses-cold"              "rpg"   "$PC_COLD_MISS" "⚡cold ✗3"
 assert_contains           "c15-misses-yellow"            "rpg"   "$PC_WARM_MISS" $'\e[93m✗2'
 assert_plain not_contains "c15-misses-zero-hidden"       "rpg"   "$PC_ZERO_MISS" "✗"
 assert_plain not_contains "c15-misses-absent-hidden"     "rpg"   "$PC_WARM"      "✗"
 assert_plain not_contains "c15-misses-bool-ignored"      "rpg"   "$PC_BOOL_MISS" "✗"
 assert_plain not_contains "c15-misses-string-ignored"    "rpg"   "$PC_STR_MISS"  "✗"
+
+# C19 prompt_cache ttl / recache_tokens_if_cold / last_miss_cause (2.1.331 docs).
+# Warm countdown gains the TTL written ("3m/5m"); a cold cache shows the tokens
+# the next request re-caches ("⚡cold 116k"); a miss count gains the short label
+# of the latest diagnosed cause ("✗2 tools"). Unknown, null, or malformed
+# values add nothing.
+pc_obj() {  # <extra fields, comma-led or ""> ; cold base with 2 misses
+  printf '{"warm":false,"caching_observed":true,"ttl":"1h","expires_at":null,"misses":2%s}' "$1"
+}
+PC_TTL_1H=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"1h\",\"expires_at\":$((PC_NOW + 200))}")
+PC_TTL_BAD=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"9d\",\"expires_at\":$((PC_NOW + 200))}")
+PC_TTL_SOON=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"1h\",\"expires_at\":$((PC_NOW + 30))}")
+PC_COLD_COST=$(pc_json "$(pc_obj ',"recache_tokens_if_cold":116463')")
+PC_COLD_COST_M=$(pc_json "$(pc_obj ',"recache_tokens_if_cold":1250000')")
+PC_COLD_COST_NULL=$(pc_json "$(pc_obj ',"recache_tokens_if_cold":null')")
+PC_COLD_COST_STR=$(pc_json "$(pc_obj ',"recache_tokens_if_cold":"116463"')")
+PC_WARM_COST=$(pc_json "{\"warm\":true,\"caching_observed\":true,\"ttl\":\"5m\",\"expires_at\":$((PC_NOW + 200)),\"recache_tokens_if_cold\":116463}")
+PC_CAUSE_TOOLS=$(pc_json "$(pc_obj ',"last_miss_cause":{"causes":["tools_changed"],"tools_added":1}')")
+PC_CAUSE_TTL=$(pc_json "$(pc_obj ',"last_miss_cause":{"causes":["ttl_expired_5m"]}')")
+PC_CAUSE_UNKNOWN_FIRST=$(pc_json "$(pc_obj ',"last_miss_cause":{"causes":["unknown","model_changed"]}')")
+PC_CAUSE_UNKNOWN=$(pc_json "$(pc_obj ',"last_miss_cause":{"causes":["unknown"]}')")
+PC_CAUSE_NULL=$(pc_json "$(pc_obj ',"last_miss_cause":null')")
+PC_CAUSE_BAD=$(pc_json "$(pc_obj ',"last_miss_cause":{"causes":"tools_changed"}')")
+PC_CAUSE_NO_MISS=$(pc_json '{"warm":false,"caching_observed":true,"expires_at":null,"misses":0,"last_miss_cause":{"causes":["tools_changed"]}}')
+
+assert_plain contains     "c19-ttl-1h-rpg"               "rpg"   "$PC_TTL_1H"    "⚡92% 3m/1h"
+assert_plain contains     "c19-ttl-1h-bloom"             "bloom" "$PC_TTL_1H"    "⚡92% 3m/1h"
+assert_plain contains     "c19-ttl-5m"                   "rpg"   "$PC_WARM"      "⚡92% 3m/5m"
+assert_plain contains     "c19-ttl-under-a-minute"       "rpg"   "$PC_TTL_SOON"  "⚡92% <1m/1h"
+assert_plain not_contains "c19-ttl-unknown-ignored"      "rpg"   "$PC_TTL_BAD"   "/9d"
+assert_plain contains     "c19-cold-cost-rpg"            "rpg"   "$PC_COLD_COST" "⚡cold 116k ✗2"
+assert_plain contains     "c19-cold-cost-bloom"          "bloom" "$PC_COLD_COST" "⚡cold 116k ✗2"
+assert_contains           "c19-cold-cost-is-gray"        "rpg"   "$PC_COLD_COST" $'\e[90m 116k'
+assert_plain contains     "c19-cold-cost-millions"       "rpg"   "$PC_COLD_COST_M" "⚡cold 1.2M"
+assert_plain contains     "c19-cold-cost-null-hidden"    "rpg"   "$PC_COLD_COST_NULL" "⚡cold ✗2"
+assert_plain contains     "c19-cold-cost-string-ignored" "rpg"   "$PC_COLD_COST_STR"  "⚡cold ✗2"
+assert_plain not_contains "c19-warm-no-cold-cost"        "rpg"   "$PC_WARM_COST" "116k"
+assert_plain contains     "c19-cause-tools-rpg"          "rpg"   "$PC_CAUSE_TOOLS" "✗2 tools"
+assert_plain contains     "c19-cause-tools-bloom"        "bloom" "$PC_CAUSE_TOOLS" "✗2 tools"
+assert_contains           "c19-cause-is-gray"            "rpg"   "$PC_CAUSE_TOOLS" $'\e[90m tools'
+assert_plain contains     "c19-cause-ttl"                "rpg"   "$PC_CAUSE_TTL"   "✗2 ttl"
+assert_plain contains     "c19-cause-skips-unknown"      "rpg"   "$PC_CAUSE_UNKNOWN_FIRST" "✗2 model"
+assert_plain not_regex    "c19-cause-unknown-hidden"     "rpg"   "$PC_CAUSE_UNKNOWN" '✗2 [a-z]'
+assert_plain not_regex    "c19-cause-null-hidden"        "rpg"   "$PC_CAUSE_NULL"    '✗2 [a-z]'
+assert_plain not_regex    "c19-cause-malformed-hidden"   "rpg"   "$PC_CAUSE_BAD"     '✗2 [a-z]'
+assert_plain not_contains "c19-cause-needs-a-miss"       "rpg"   "$PC_CAUSE_NO_MISS" "tools"
+
+# C19 rate_limits without five_hour (seen live on 2.1.331): the 7d bar renders
+# alone, no empty 5h bar.
+RL_7D_ONLY='{"model":{"display_name":"Opus"},"rate_limits":{"seven_day":{"used_percentage":33,"resets_at":'$((PC_NOW + 90000))'}}}'
+assert_plain contains     "c19-seven-day-only-renders"   "rpg"   "$RL_7D_ONLY" "7d ["
+assert_plain not_contains "c19-seven-day-only-no-5h"     "rpg"   "$RL_7D_ONLY" "5h"
 
 # C3 1M context window badge
 assert_contains "c3-1m-badge" "rpg" \
@@ -1446,6 +1498,10 @@ else
   FAIL=$((FAIL + 1)); FAILED_NAMES+=("c10-scoped-after-7d"); echo "FAIL: c10-scoped-after-7d"; echo "  Output: $SCOPED_OUT"
 fi
 
+# backdate_2m <file>: set mtime two minutes back. Portable: BSD touch (macOS)
+# has no -d "2 minutes ago".
+backdate_2m() { python3 -c 'import os,sys,time; t=time.time()-120; os.utime(sys.argv[1],(t,t))' "$1"; }
+
 # --- hooks/fetch-usage.sh ---
 # Fake curl + fake credentials; the hook must write only label/percent/resets_at,
 # never the token, and must skip the network when the cache is fresh.
@@ -1557,7 +1613,7 @@ run_fetch_hook_old() {
   fake_security "$tmp/bin"
   printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-FAKETOKENXYZ"}}\n' > "$tmp/home/.claude/.credentials.json"
   printf '[{"label":"Old","percent":9,"resets_at":1}]\n' > "$tmp/home/.claude/cache/usage-limits.json"
-  touch -d "2 minutes ago" "$tmp/home/.claude/cache/usage-limits.json"
+  backdate_2m "$tmp/home/.claude/cache/usage-limits.json"
   HOME="$tmp/home" PATH="$tmp/bin:$PATH" FAKE_CURL_MARKER="$tmp/curl.called" bash "$FETCH_HOOK" >/dev/null 2>&1
   FH_STATUS=$?
   local i; for i in 1 2 3 4 5 6 7 8 9 10; do [ -f "$tmp/curl.called" ] && break; sleep 0.2; done
@@ -1599,7 +1655,7 @@ FAKE
   fake_security "$FH_TMP/bin"
   printf '{"claudeAiOauth":{"accessToken":"sk-ant-oat01-FAKETOKENXYZ"}}\n' > "$FH_TMP/home/.claude/.credentials.json"
   printf '[{"label":"Old","percent":9,"resets_at":1}]\n' > "$FH_TMP/home/.claude/cache/usage-limits.json"
-  touch -d "2 minutes ago" "$FH_TMP/home/.claude/cache/usage-limits.json"
+  backdate_2m "$FH_TMP/home/.claude/cache/usage-limits.json"
   [ -n "$stamp" ] && printf '%s\n' "$stamp" > "$FH_TMP/home/.claude/cache/usage-limits.next"
   return 0
 }
@@ -1623,13 +1679,13 @@ fh_env 22 ""
 fh_invoke; FH_FIRST_CALLED=$FH_CURL_CALLED; FH_FAIL_NEXT=$FH_NEXT; FH_NOW=$(date +%s)
 fh_invoke
 fh_check "c11-hook-failure-not-retried-next-stop" "$([ "$FH_FIRST_CALLED" = 1 ] && [ "$FH_CURL_CALLED" = 0 ]; echo $?)"
-fh_check "c11-hook-failure-backs-off-minutes" "$(case "$FH_FAIL_NEXT" in ''|*[!0-9]*) echo 1 ;; *) [ "$FH_FAIL_NEXT" -ge $((FH_NOW + 200)) ]; echo $? ;; esac)"
+fh_check "c11-hook-failure-backs-off-minutes" "$(case "$FH_FAIL_NEXT" in (''|*[!0-9]*) echo 1 ;; (*) [ "$FH_FAIL_NEXT" -ge $((FH_NOW + 200)) ]; echo $? ;; esac)"
 rm -rf "$FH_TMP"
 
 # A successful fetch arms the normal one-minute throttle, not the long backoff.
 fh_env 0 ""
 fh_invoke; FH_NOW=$(date +%s)
-fh_check "c11-hook-success-throttles-one-minute" "$(case "$FH_NEXT" in ''|*[!0-9]*) echo 1 ;; *) [ "$FH_CURL_CALLED" = 1 ] && [ "$FH_NEXT" -gt "$FH_NOW" ] && [ "$FH_NEXT" -le $((FH_NOW + 90)) ]; echo $? ;; esac)"
+fh_check "c11-hook-success-throttles-one-minute" "$(case "$FH_NEXT" in (''|*[!0-9]*) echo 1 ;; (*) [ "$FH_CURL_CALLED" = 1 ] && [ "$FH_NEXT" -gt "$FH_NOW" ] && [ "$FH_NEXT" -le $((FH_NOW + 90)) ]; echo $? ;; esac)"
 fh_check "c11-hook-success-writes-cache" "$(printf '%s' "$FH_CACHE" | grep -q Fable; echo $?)"
 rm -rf "$FH_TMP"
 
