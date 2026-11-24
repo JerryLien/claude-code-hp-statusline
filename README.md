@@ -275,8 +275,9 @@ chmod +x ~/.claude/hooks/fetch-usage.sh
 }
 ```
 
-The hook reads the OAuth token from `~/.claude/.credentials.json`, sends it only
-to `api.anthropic.com`, and writes a token-free cache
+The hook reads the OAuth token from `~/.claude/.credentials.json`, or on macOS,
+where Claude Code keeps it in the login Keychain, from the `Claude Code-credentials`
+item. It sends the token only to `api.anthropic.com`, and writes a token-free cache
 (`~/.claude/cache/usage-limits.json`: `label`, `percent`, `resets_at`). It runs
 detached, caps the request at 5 seconds, makes at most one request a minute and
 none for 5 minutes after a failed one (the endpoint rate-limits logins, and

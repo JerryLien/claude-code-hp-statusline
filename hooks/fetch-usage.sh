@@ -23,12 +23,17 @@ set -u
 CACHE="${HOME}/.claude/cache/usage-limits.json"
 NEXT="${HOME}/.claude/cache/usage-limits.next"
 CREDS="${HOME}/.claude/.credentials.json"
+# On macOS Claude Code keeps the OAuth credentials in the login Keychain
+# instead of $CREDS, under this generic-password service name.
+KEYCHAIN_SERVICE="Claude Code-credentials"
 URL="https://api.anthropic.com/api/oauth/usage"
 THROTTLE_SECS=60
 BACKOFF_SECS=300
 
-# API-key users have no OAuth credentials -> nothing to fetch.
-[ -f "$CREDS" ] || exit 0
+# No credentials file and no Keychain to look in (API-key users on Linux)
+# -> nothing to fetch. A Keychain without the entry is found out later, in
+# the detached fetch, so the foreground never waits on `security`.
+[ -f "$CREDS" ] || command -v security >/dev/null 2>&1 || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
 mkdir -p "$(dirname "$CACHE")" 2>/dev/null
@@ -49,7 +54,14 @@ printf '%s\n' "$((now + THROTTLE_SECS))" > "$NEXT" 2>/dev/null
 (
   backoff() { printf '%s\n' "$(( $(date +%s) + BACKOFF_SECS ))" > "$NEXT" 2>/dev/null; }
 
-  TOKEN=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["claudeAiOauth"]["accessToken"])' "$CREDS" 2>/dev/null)
+  # Credentials JSON comes from the file when present, else the Keychain; it
+  # reaches python on stdin so the token never appears in `ps`.
+  read_creds() {
+    if [ -f "$CREDS" ]; then cat "$CREDS"
+    else security find-generic-password -s "$KEYCHAIN_SERVICE" -w 2>/dev/null
+    fi
+  }
+  TOKEN=$(read_creds | python3 -c 'import json,sys; print(json.load(sys.stdin)["claudeAiOauth"]["accessToken"])' 2>/dev/null)
   [ -n "$TOKEN" ] || exit 0
 
   RAW="${CACHE}.raw.$$"
