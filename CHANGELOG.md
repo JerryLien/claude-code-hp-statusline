@@ -5,8 +5,17 @@ Versions are tagged in the `VERSION` file and embedded in the script as `STATUSL
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-11-24
+
+- **Cold cache cost** (`prompt_cache.recache_tokens_if_cold`): `⚡cold` is followed in grey by the tokens the next request writes to the cache again (`⚡cold 116k`). Claude Code reports null right after a compaction, and then nothing is added
+- **Cache miss cause** (`prompt_cache.last_miss_cause`): a short grey label after `✗N` names the likely cause of the latest miss: `sys`, `tools`, `model`, `rewrite`, `ttl` or `server` (`✗2 tools`). `unknown` and unrecognised causes add nothing. `expected_rebuilds` (compaction and tool-result clearing) is documented as separate from `misses` and is not shown
+- **Cache TTL** (`prompt_cache.ttl`): the warm countdown names the TTL the last request wrote (`⚡92% 3m/5m`, `<1m/1h`)
+- Field semantics come from the status line input docs that Claude Code 2.1.331 embeds. A live 2.1.331 payload also showed `rate_limits` with only `seven_day`; the 7d bar renders alone, as before
 - **Fix: per-model weekly cap bar on macOS**: `hooks/fetch-usage.sh` read the OAuth token only from `~/.claude/.credentials.json`, which Claude Code does not create on macOS (it keeps the credentials in the login Keychain), so the hook always exited and the Fable bar never appeared there. When the file is absent the hook now reads the `Claude Code-credentials` Keychain item with `security`. The file still wins when present. The Keychain read runs in the detached fetch, after the throttle, so the foreground never waits on it, and the credentials reach `python3` on stdin, keeping the token out of `ps`
+- **Fix: effort level on macOS**: `${EFFORT,,}` is bash 4 syntax. macOS's `/bin/bash` 3.2 failed on it, so the effort level never rendered there. The script now lowercases with `tr`
+- README: Claude Code 2.1.323 removed the `subagentStatusLine` setting, so the subagent-row section now says it applies only to older versions
 - Tests: the hook cases put a fake `security` on `PATH`, so the suite never reads the real Keychain. Fixed a `$FIT_LONG·` expansion that macOS bash 3.2 read as part of the variable name, which aborted the suite at c17 under `set -u`. +4 cases (Keychain-only fetch, Keychain token sent, Keychain token never cached, file preferred over Keychain) (290 → 294)
+- Tests: the suite now passes on macOS's bash 3.2 and BSD `touch`. `case` patterns inside `$(...)` are written with a leading `(`, and cache files are backdated with `os.utime` instead of GNU `touch -d`. +23 cases (TTL in both themes and under a minute, unknown TTL ignored, cold cost in k / M, grey, null and string ignored, absent while warm, miss cause in both themes, grey, `ttl`, `unknown` skipped then hidden, null and malformed hidden, no label without a miss, `rate_limits` with only `seven_day`) (294 → 317)
 
 ## [0.13.0] — 2026-10-27
 

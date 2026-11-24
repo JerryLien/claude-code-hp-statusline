@@ -8,7 +8,7 @@
 
 # Bump on each release; the companion update-check hook compares this
 # against the latest VERSION file on GitHub.
-STATUSLINE_HP_VERSION="0.13.0"
+STATUSLINE_HP_VERSION="0.14.0"
 export STATUSLINE_HP_VERSION
 
 input=$(cat)
@@ -393,12 +393,47 @@ if isinstance(pc, dict) and pc.get("caching_observed") is True:
                 cache_ttl = "<1m"
     else:
         cache_state = "cold"
-# misses: requests that re-processed content the cache already held
+def _is_num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+# ttl: the TTL the last request wrote ("5m" | "1h"), shown after a warm countdown
+if cache_ttl and pc.get("ttl") in ("5m", "1h"):
+    cache_ttl += "/" + pc["ttl"]
+# recache_tokens_if_cold: what the next request re-caches once cold (null
+# right after a compaction), shown after the cold marker
+cache_cold_cost = ""
+if cache_state == "cold":
+    rc = pc.get("recache_tokens_if_cold")
+    if _is_num(rc) and rc > 0:
+        if rc >= 1000000:
+            cache_cold_cost = f"{rc/1000000:.1f}M"
+        elif rc >= 1000:
+            cache_cold_cost = f"{rc/1000:.0f}k"
+        else:
+            cache_cold_cost = str(int(rc))
+# misses: requests whose cached prefix shrank without a compaction explaining
+# it. Compaction / tool-result-clearing rebuilds are counted separately
+# (expected_rebuilds) and are not shown: they are planned, not lost cache.
 cache_misses = 0
+cache_miss_cause = ""
+MISS_CAUSE_LABELS = {
+    "system_prompt_changed": "sys", "tools_changed": "tools",
+    "model_changed": "model", "messages_rewritten": "rewrite",
+    "ttl_expired_5m": "ttl", "ttl_expired_1h": "ttl",
+    "likely_server_side": "server",
+}
 if cache_state:
     mv = pc.get("misses")
     if isinstance(mv, int) and not isinstance(mv, bool) and mv > 0:
         cache_misses = mv
+        # last_miss_cause.causes: closed set, client-side heuristic; "unknown"
+        # and unrecognised names add nothing
+        lmc = pc.get("last_miss_cause")
+        causes = lmc.get("causes") if isinstance(lmc, dict) else None
+        if isinstance(causes, list):
+            for cause in causes:
+                if cause in MISS_CAUSE_LABELS:
+                    cache_miss_cause = MISS_CAUSE_LABELS[cause]
+                    break
 
 ctx_size = g(d, "context_window", "context_window_size") or 0
 is_1m_ctx = 1 if ctx_size >= 1_000_000 else 0
@@ -495,6 +530,8 @@ print(f"CACHE_PCT={cache_pct}")
 print(f"CACHE_STATE=\"{cache_state}\"")
 print(f"CACHE_TTL=\"{sh(cache_ttl)}\"")
 print(f"CACHE_MISSES={cache_misses}")
+print(f"CACHE_MISS_CAUSE=\"{sh(cache_miss_cause)}\"")
+print(f"CACHE_COLD_COST=\"{sh(cache_cold_cost)}\"")
 print(f"THEME_FILE=\"{sh(theme_file)}\"")
 print(f"IS_1M_CTX={is_1m_ctx}")
 print(f"THINKING_OFF={thinking_off}")
@@ -687,7 +724,8 @@ parts_row2=""
 EFFORT_ICON=""
 if [ -n "$EFFORT" ]; then
   # Case-insensitive match so "Max"/"max"/"MAX" all work
-  case "${EFFORT,,}" in
+  # tr, not ${EFFORT,,}: macOS ships bash 3.2, which has no case conversion
+  case "$(printf '%s' "$EFFORT" | tr '[:upper:]' '[:lower:]')" in
     max)    EFFORT_ICON="${EFFORT_MAX_STYLE}${EFFORT_MAX}${RESET}" ;;
     xhigh)  EFFORT_ICON="${EFFORT_XHIGH_STYLE}${EFFORT_XHIGH}${RESET}" ;;
     high)   EFFORT_ICON="${EFFORT_HIGH_STYLE}${EFFORT_HIGH}${RESET}" ;;
@@ -777,6 +815,8 @@ parts_row2+="  $(ctx_bar "$CTX")"
 cache_shown=0
 if [ "${CACHE_STATE:-}" = "cold" ]; then
   parts_row2+=" ${GRAY}⚡cold${RESET}"
+  # tokens the next request re-caches (prompt_cache.recache_tokens_if_cold)
+  [ -n "${CACHE_COLD_COST:-}" ] && parts_row2+="${GRAY} ${CACHE_COLD_COST}${RESET}"
   cache_shown=1
 elif [ "${CACHE_PCT:-"-1"}" -ge 0 ] 2>/dev/null; then
   if [ "$CACHE_PCT" -ge 70 ]; then cache_color="$BRIGHT_GREEN"
@@ -789,6 +829,8 @@ fi
 # Cache misses this session (prompt_cache.misses), after the cache segment
 if [ "$cache_shown" = 1 ] && [ "${CACHE_MISSES:-0}" -gt 0 ] 2>/dev/null; then
   parts_row2+=" ${BRIGHT_YELLOW}✗${CACHE_MISSES}${RESET}"
+  # likely cause of the latest miss (prompt_cache.last_miss_cause), grey
+  [ -n "${CACHE_MISS_CAUSE:-}" ] && parts_row2+="${GRAY} ${CACHE_MISS_CAUSE}${RESET}"
 fi
 
 # 200k threshold: exceeds_200k_tokens is a fixed 200k flag regardless of

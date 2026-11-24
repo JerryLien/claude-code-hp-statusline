@@ -3,11 +3,11 @@
 > Turn your [Claude Code](https://claude.com/claude-code) status line into a game HUD. See usage limits as health bars, catch cache-miss regressions instantly, and get a loud heads-up the moment a new release drops.
 
 ```
-⚔ Opus[1M] 📁 my-project ↑high  ❤ 5h [█████████░░░░░░] 65% ↻2h29m  ❤ 7d [████░░░░░░░░░░░] 28% ↻1d4h  🧠 ▮▮▮▮▯▯▯▯▯▯ 42% ⚡87% 3m  🔮 2m14s/45m  💰 $2.80  +87/-12  v2.1.105
+⚔ Opus[1M] 📁 my-project ↑high  ❤ 5h [█████████░░░░░░] 65% ↻2h29m  ❤ 7d [████░░░░░░░░░░░] 28% ↻1d4h  🧠 ▮▮▮▮▯▯▯▯▯▯ 42% ⚡87% 3m/5m  🔮 2m14s/45m  💰 $2.80  +87/-12  v2.1.105
 ```
 
 ```
-🌱 Opus[1M] 📁 my-project 🔴 high  5h 🌸🌸🌸🌸🌸·········· 35% ↻2h29m  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72% ↻1d4h  🍄 🌸🌸🌸🌸······ 42% ⚡87% 3m  🌿 2m14s/45m  🌕 $2.80  +87/-12  v2.1.105
+🌱 Opus[1M] 📁 my-project 🔴 high  5h 🌸🌸🌸🌸🌸·········· 35% ↻2h29m  7d 🌸🌸🌸🌸🌸🌸🌸🌸🌸🌸····· 72% ↻1d4h  🍄 🌸🌸🌸🌸······ 42% ⚡87% 3m/5m  🌿 2m14s/45m  🌕 $2.80  +87/-12  v2.1.105
 ```
 
 ## Why?
@@ -19,7 +19,7 @@ The default status line tells you very little. This one turns everything that ma
 - ❤ **Health-bar rate limits** — 5-hour and 7-day windows with countdown to reset
 - ❤ **Per-model weekly caps** — a third bar for model-scoped limits such as the Fable weekly cap (needs the optional usage hook, see below)
 - 🧠 **Context window meter** — know exactly how much headroom you have
-- ⚡ **Cache hit ratio** — realtime feedback that your prompt caching is actually working, plus how long a warm cache has left, a grey `⚡cold` once it expires, and a yellow `✗N` cache-miss count
+- ⚡ **Cache hit ratio** — realtime feedback that your prompt caching is actually working, plus how long a warm cache has left, a grey `⚡cold` with the tokens the next request re-caches once it expires, and a yellow `✗N` cache-miss count with the likely cause
 - ⚠ **200k threshold alert** — loud warning the moment per-token pricing jumps
 - 🔮 **Total casting time** — how long you've been waiting on Claude this session
 - 💰 **Session cost** — equivalent API cost, even on Pro/Max subscriptions
@@ -57,7 +57,7 @@ The default status line tells you very little. This one turns everything that ma
 
 ### Smart alerts
 
-- **⚡ Cache hit ratio** — Green ≥70%, yellow ≥30%, red <30%. A great real-time check that prompt caching is actually working. With Claude Code 2.1.251+ (`prompt_cache`), a warm cache adds its time to expiry in grey (`⚡87% 3m`, `<1m` in the last minute), and once it has gone cold the ratio is replaced by a grey `⚡cold`: the next request writes the whole context to the cache again. Claude Code re-runs the statusline the moment the cache expires; set `refreshInterval` so the countdown keeps moving while idle. A yellow `✗N` after the cache segment counts this session's cache misses (`prompt_cache.misses`): requests that re-processed content the cache already held, each one writing it to the cache again. `/cost` names the likely cause of each miss
+- **⚡ Cache hit ratio** — Green ≥70%, yellow ≥30%, red <30%. A great real-time check that prompt caching is actually working. With Claude Code 2.1.251+ (`prompt_cache`), a warm cache adds its time to expiry and the TTL it was written with in grey (`⚡87% 3m/5m`, `<1m/1h` in the last minute), and once it has gone cold the ratio is replaced by a grey `⚡cold` followed by the tokens the next request writes to the cache again (`⚡cold 116k`, `prompt_cache.recache_tokens_if_cold`; nothing right after a compaction, when Claude Code reports null). Claude Code re-runs the statusline the moment the cache expires; set `refreshInterval` so the countdown keeps moving while idle. A yellow `✗N` after the cache segment counts this session's cache misses (`prompt_cache.misses`): requests that re-processed content the cache already held, each one writing it to the cache again. A short grey label after it names the likely cause of the latest miss (`prompt_cache.last_miss_cause`, a client-side heuristic): `sys` system prompt changed, `tools` tools changed, `model` model changed, `rewrite` earlier messages rewritten, `ttl` the cache expired, `server` likely server side (`⚡cold 116k ✗2 tools`). An undiagnosed miss shows the count alone; `/cost` breaks down every miss. Rebuilds that a compaction or tool-result clearing announced (`expected_rebuilds`) are not misses and are not counted
 - **⚠ 200k** — Red warning badge when the session crosses the 200k-token threshold (where per-token pricing jumps)
 - **🔮 / 🌿 Casting time + wall time** — Total time spent waiting on Claude API responses, followed by total session wall time (e.g. `🔮 2m14s/45m`). RPG: 🔮 crystal ball · Bloom: 🌿 growing plant
 - **v2.1.100→2.1.105** — Version badge goes yellow-highlighted with the target version when a newer release is detected in Claude Code's local changelog cache
@@ -75,6 +75,11 @@ Only appear when the relevant data is present:
 - **📁 owner/repo** — When Claude Code reports the repository identity (`workspace.repo.owner` + `.name`), the directory badge shows `owner/name` instead of the checkout directory basename
 
 ## Subagent status line
+
+> **Claude Code 2.1.323 removed the `subagentStatusLine` setting.** Subagent rows
+> now always use Claude Code's built-in look, so nothing in this section renders
+> on 2.1.323 or later. Settings that still hold the key load without error. The
+> section is kept for older versions.
 
 Since 0.7.0 the same script also renders the per-subagent rows in the agent
 panel. Point the `subagentStatusLine` setting at it — the script auto-detects
